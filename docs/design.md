@@ -71,7 +71,8 @@ Dedicated repository platforms (Dataverse, DSpace, Zenodo etc.) solve this probl
 | Job queues                  | Laravel Horizon + Redis                                   |
 | DataCite SDK                | `vincentauger/datacite-php-sdk` (built on Saloon)         |
 | Sierra SDK                  | `vincentauger/sierra-php-sdk` (built on Saloon, optional) |
-| Code quality                | Larastan (PHPStan level 8), Rector, Laravel Pint          |
+| Frontend code quality       | @antfu/eslint-config (linting + formatting)               |
+| Backend code quality        | Larastan (PHPStan level 8), Rector, Laravel Pint          |
 | Testing                     | Pest PHP                                                  |
 | CI/CD                       | GitHub Actions with self-hosted runner                    |
 | Deployment                  | Docker Compose (self-hosted, on-prem VM)                  |
@@ -628,6 +629,7 @@ Certain metadata fields (titles, descriptions) require bilingual input when the 
 | Larastan (PHPStan level 8)       | Static analysis, PHP type safety                                           |
 | Rector                           | Automated refactoring, PHP version upgrades                                |
 | Laravel Pint                     | PHP code style (PSR-12)                                                    |
+| @antfu/eslint-config             | Frontend linting, formatting, and code style (replaces Prettier + ESLint)  |
 | TypeScript strict mode + vue-tsc | Frontend type safety                                                       |
 | Wayfinder                        | Auto-generated TypeScript route/action functions                           |
 | Spatie Laravel Data              | Typed Data objects, colocated validation, auto-generated TypeScript         |
@@ -772,8 +774,9 @@ Standard CI (on every PR):
 
 1. Larastan static analysis
 2. Rector dry-run
-3. `vue-tsc --noEmit`
-4. Pest unit + feature tests (fixtures only, no network)
+3. `eslint .` (antfu config — linting + formatting)
+4. `vue-tsc --noEmit`
+5. Pest unit + feature tests (fixtures only, no network)
 
 Integration CI (nightly, separate workflow):
 
