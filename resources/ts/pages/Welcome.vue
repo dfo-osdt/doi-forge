@@ -116,10 +116,10 @@ const { t } = useI18n()
     <!-- Footer -->
     <footer class="relative z-10 px-6 py-5 text-center lg:px-10">
       <div
-        class="text-[10px] tracking-[0.3em] text-[#706f6c] uppercase dark:text-[#5a5a52]"
+        class="text-[10px] tracking-[0.3em] text-[#706f6c] dark:text-[#5a5a52]"
         style="font-family: 'IBM Plex Mono', monospace;"
       >
-        Open Source · DataCite · FAIR
+        v0.0.0
       </div>
     </footer>
   </div>
