@@ -1,12 +1,22 @@
-import type { ComputedRef, Ref } from 'vue'
+import type { Component, ComputedRef, Ref } from 'vue'
 import type { Appearance, ResolvedAppearance } from '@/types'
+import { Monitor, Moon, Sun } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 export type { Appearance, ResolvedAppearance }
+
+export interface AppearanceOption {
+  value: Appearance
+  Icon: Component
+  label: string
+}
 
 export interface UseAppearanceReturn {
   appearance: Ref<Appearance>
   resolvedAppearance: ComputedRef<ResolvedAppearance>
+  options: ComputedRef<AppearanceOption[]>
+  activeIcon: ComputedRef<Component>
   updateAppearance: (value: Appearance) => void
 }
 
@@ -87,6 +97,8 @@ export function initializeTheme(): void {
 const appearance = ref<Appearance>('system')
 
 export function useAppearance(): UseAppearanceReturn {
+  const { t } = useI18n()
+
   onMounted(() => {
     const savedAppearance = localStorage.getItem(
       'appearance',
@@ -105,6 +117,16 @@ export function useAppearance(): UseAppearanceReturn {
     return appearance.value
   })
 
+  const options = computed<AppearanceOption[]>(() => [
+    { value: 'light', Icon: Sun, label: t('appearance.light') },
+    { value: 'dark', Icon: Moon, label: t('appearance.dark') },
+    { value: 'system', Icon: Monitor, label: t('appearance.system') },
+  ])
+
+  const activeIcon = computed<Component>(
+    () => options.value.find(o => o.value === appearance.value)?.Icon ?? Monitor,
+  )
+
   function updateAppearance(value: Appearance) {
     appearance.value = value
 
@@ -120,6 +142,8 @@ export function useAppearance(): UseAppearanceReturn {
   return {
     appearance,
     resolvedAppearance,
+    options,
+    activeIcon,
     updateAppearance,
   }
 }

@@ -1,14 +1,7 @@
 <script setup lang="ts">
-import { Monitor, Moon, Sun } from 'lucide-vue-next'
 import { useAppearance } from '@/composables/useAppearance'
 
-const { appearance, updateAppearance } = useAppearance()
-
-const tabs = [
-  { value: 'light', Icon: Sun, label: 'Light' },
-  { value: 'dark', Icon: Moon, label: 'Dark' },
-  { value: 'system', Icon: Monitor, label: 'System' },
-] as const
+const { appearance, options, updateAppearance } = useAppearance()
 </script>
 
 <template>
@@ -16,7 +9,7 @@ const tabs = [
     class="inline-flex gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800"
   >
     <button
-      v-for="{ value, Icon, label } in tabs"
+      v-for="{ value, Icon, label } in options"
       :key="value"
       class="flex items-center rounded-md px-3.5 py-1.5 transition-colors" :class="[
         appearance === value

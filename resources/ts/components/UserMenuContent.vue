@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import type { User } from '@/types'
-import { Link, router } from '@inertiajs/vue3'
-import { LogOut, Settings } from 'lucide-vue-next'
+import { Link, router, usePage } from '@inertiajs/vue3'
+import { Globe, LogOut, Settings } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { update as updateLocale } from '@/actions/App/Http/Controllers/LocaleController'
 import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
 import UserInfo from '@/components/UserInfo.vue'
 import { logout } from '@/routes'
@@ -17,6 +24,18 @@ interface Props {
 }
 
 defineProps<Props>()
+
+const page = usePage()
+const currentLocale = computed(() => page.props.locale)
+
+const locales = [
+  { value: 'en', label: 'English' },
+  { value: 'fr', label: 'Français' },
+]
+
+function switchLocale(locale: string) {
+  router.patch(updateLocale().url, { locale })
+}
 
 function handleLogout() {
   router.flushAll()
@@ -37,6 +56,19 @@ function handleLogout() {
         Settings
       </Link>
     </DropdownMenuItem>
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger>
+        <Globe class="mr-2 h-4 w-4" />
+        Language
+      </DropdownMenuSubTrigger>
+      <DropdownMenuSubContent>
+        <DropdownMenuRadioGroup :model-value="currentLocale" @update:model-value="switchLocale">
+          <DropdownMenuRadioItem v-for="locale in locales" :key="locale.value" :value="locale.value">
+            {{ locale.label }}
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
   </DropdownMenuGroup>
   <DropdownMenuSeparator />
   <DropdownMenuItem :as-child="true">

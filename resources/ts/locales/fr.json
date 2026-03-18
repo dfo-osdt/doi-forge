@@ -1,0 +1,9 @@
+{
+  "log-in": "Se connecter",
+  "register": "S'inscrire",
+  "appearance": {
+    "light": "Clair",
+    "dark": "Sombre",
+    "system": "Système"
+  }
+}
