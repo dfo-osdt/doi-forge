@@ -7,8 +7,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [
     laravel({
-      input: ['resources/js/app.ts'],
-      ssr: 'resources/js/ssr.ts',
+      input: ['resources/ts/app.ts'],
       refresh: true,
     }),
     tailwindcss(),
@@ -21,6 +20,8 @@ export default defineConfig({
       },
     }),
     wayfinder({
+      path: 'resources/ts',
+      command: 'php artisan wayfinder:generate --path=resources/ts',
       formVariants: true,
     }),
   ],

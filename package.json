@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "build": "vite build",
-    "build:ssr": "vite build && vite build --ssr",
     "dev": "vite",
     "lint": "eslint . --fix",
     "lint:check": "eslint .",

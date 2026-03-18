@@ -116,12 +116,12 @@ TypeScript Transformer    → auto-generated TypeScript from Data classes, enums
 ```
 PHP Data classes (form payloads, page props, API responses, enums)
     → php artisan typescript:transform
-    → resources/js/types/ (auto-generated)
+    → resources/ts/types/ (auto-generated)
     → Vue components consume fully typed shapes
 
 PHP controllers & routes
     → wayfinder:generate
-    → resources/js/wayfinder/ (auto-generated, never manually edited)
+    → resources/ts/wayfinder/ (auto-generated, never manually edited)
     → Vue components call typed actions
 ```
 

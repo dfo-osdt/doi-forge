@@ -17,7 +17,7 @@ export function getInitials(fullName?: string): string {
     return names[0].charAt(0).toUpperCase()
   }
 
-  return `${names[0].charAt(0)}${names.at(-1).charAt(0)}`.toUpperCase()
+  return `${names[0].charAt(0)}${names.at(-1)!.charAt(0)}`.toUpperCase()
 }
 
 export function useInitials(): UseInitialsReturn {
