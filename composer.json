@@ -1,15 +1,17 @@
 {
   "$schema": "https://getcomposer.org/schema.json",
-  "name": "laravel/vue-starter-kit",
+  "name": "dfo-mpo/doi-forge",
   "type": "project",
-  "description": "The skeleton application for the Laravel framework.",
+  "description": "DOI governance and orchestration layer for institutions managing DataCite repositories.",
   "keywords": [
-    "laravel",
-    "framework"
+    "doi",
+    "datacite",
+    "open-science",
+    "laravel"
   ],
   "license": "MIT",
   "require": {
-    "php": "^8.3",
+    "php": "^8.4",
     "inertiajs/inertia-laravel": "^2.0",
     "laravel/fortify": "^1.34",
     "laravel/framework": "^13.0",
@@ -19,6 +21,7 @@
   "require-dev": {
     "barryvdh/laravel-ide-helper": "^3.7",
     "fakerphp/faker": "^1.24",
+    "larastan/larastan": "^3.0",
     "laravel/boost": "^2.0",
     "laravel/pail": "^1.2.5",
     "laravel/pint": "^1.27",

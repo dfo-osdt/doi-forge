@@ -1,3 +1,4 @@
+/.phpstan.cache
 /.phpunit.cache
 /bootstrap/ssr
 /node_modules
@@ -30,3 +31,4 @@ yarn-error.log
 /.claude
 /.mcp.json
 /opencode.json
+CLAUDE.md
