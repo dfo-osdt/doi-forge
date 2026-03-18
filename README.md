@@ -22,15 +22,15 @@ DOI Forge is **not** a DOI registry. DataCite remains the system of record for a
 
 ## Stack
 
-| Component         | Technology                          |
-| ----------------- | ----------------------------------- |
-| Backend           | Laravel 13, PHP 8.4                 |
-| Frontend          | Vue 3 + Inertia.js, TypeScript      |
-| UI                | shadcn-vue                          |
-| Database          | SQLite                              |
-| Authentication    | Microsoft Entra ID (prod), Breeze (dev) |
-| API auth          | Laravel Sanctum                     |
-| DataCite SDK      | `vincentauger/datacite-php-sdk`     |
+| Component      | Technology                              |
+| -------------- | --------------------------------------- |
+| Backend        | Laravel 13, PHP 8.4                     |
+| Frontend       | Vue 3 + Inertia.js, TypeScript          |
+| UI             | shadcn-vue                              |
+| Database       | SQLite                                  |
+| Authentication | Microsoft Entra ID (prod), Breeze (dev) |
+| API auth       | Laravel Sanctum                         |
+| DataCite SDK   | `vincentauger/datacite-php-sdk`         |
 
 See [`docs/design.md`](docs/design.md) for the full system design document.
 
@@ -80,9 +80,9 @@ Unless otherwise noted, the source code of this project is covered under Crown C
 
 The Canada wordmark and related graphics associated with this distribution are protected under trademark law and copyright law. No permission is granted to use them outside the parameters of the Government of Canada's corporate identity program. For more information, see [Federal identity requirements](https://www.canada.ca/en/treasury-board-secretariat/topics/government-communications/federal-identity-requirements.html).
 
-______________________
+---
 
-# DOI Forge — Gouvernance et orchestration de DOI pour les institutions
+## DOI Forge — Gouvernance et orchestration de DOI pour les institutions
 
 DOI Forge est une couche open source d'orchestration et de gouvernance de DOI pour les institutions qui ont besoin d'un contrôle multi-utilisateur sur leurs dépôts DataCite. Il se place entre les utilisateurs et l'API DataCite, ajoutant le contrôle d'accès basé sur les rôles, les profils de métadonnées, un flux d'approbation et une piste d'audit complète — des fonctionnalités que DataCite Fabrica ne fournit pas nativement.
 

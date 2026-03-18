@@ -69,7 +69,7 @@ This project has domain-specific skills available. You MUST activate the relevan
 
 === boost rules ===
 
-# Laravel Boost
+## Laravel Boost
 
 - Laravel Boost is an MCP server that comes with powerful tools designed specifically for this application. Use them.
 
@@ -113,14 +113,14 @@ This project has domain-specific skills available. You MUST activate the relevan
 
 === php rules ===
 
-# PHP
+## PHP
 
 - Always use curly braces for control structures, even for single-line bodies.
 
 ## Constructors
 
 - Use PHP 8 constructor property promotion in `__construct()`.
-    - `public function __construct(public GitHub $github) { }`
+  - `public function __construct(public GitHub $github) { }`
 - Do not allow empty `__construct()` methods with zero parameters unless the constructor is private.
 
 ## Type Declarations
@@ -129,6 +129,7 @@ This project has domain-specific skills available. You MUST activate the relevan
 - Use appropriate PHP type hints for method parameters.
 
 <!-- Explicit Return Types and Method Params -->
+
 ```php
 protected function isAccessible(User $user, ?string $path = null): bool
 {
@@ -150,21 +151,21 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 === tests rules ===
 
-# Test Enforcement
+## Test Enforcement
 
 - Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
 - Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
 
 === inertia-laravel/core rules ===
 
-# Inertia
+## Inertia
 
 - Inertia creates fully client-side rendered SPAs without modern SPA complexity, leveraging existing server-side patterns.
 - Components live in `resources/js/pages` (unless specified in `vite.config.js`). Use `Inertia::render()` for server-side routing instead of Blade views.
 - ALWAYS use `search-docs` tool for version-specific Inertia documentation and updated code examples.
 - IMPORTANT: Activate `inertia-vue-development` when working with Inertia Vue client-side patterns.
 
-# Inertia v2
+## Inertia v2
 
 - Use all Inertia features from v1 and v2. Check the documentation before making changes to ensure the correct approach.
 - New features: deferred props, infinite scroll, merging props, polling, prefetching, once props, flash data.
@@ -172,7 +173,7 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 === laravel/core rules ===
 
-# Do Things the Laravel Way
+## Do Things the Laravel Way
 
 - Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using `php artisan list` and check their parameters with `php artisan [command] --help`.
 - If you're creating a generic PHP class, use `php artisan make:class`.
@@ -227,7 +228,7 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 === wayfinder/core rules ===
 
-# Laravel Wayfinder
+## Laravel Wayfinder
 
 Wayfinder generates TypeScript functions for Laravel routes. Import from `@/actions/` (controllers) or `@/routes/` (named routes).
 
@@ -239,7 +240,7 @@ Wayfinder generates TypeScript functions for Laravel routes. Import from `@/acti
 
 === pint/core rules ===
 
-# Laravel Pint Code Formatter
+## Laravel Pint Code Formatter
 
 - If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
 - Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
@@ -254,9 +255,10 @@ Wayfinder generates TypeScript functions for Laravel routes. Import from `@/acti
 
 === inertia-vue/core rules ===
 
-# Inertia + Vue
+## Inertia + Vue
 
 Vue components must have a single root element.
+
 - IMPORTANT: Activate `inertia-vue-development` when working with Inertia Vue client-side patterns.
 
 </laravel-boost-guidelines>

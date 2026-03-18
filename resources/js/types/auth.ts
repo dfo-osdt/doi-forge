@@ -1,20 +1,20 @@
-export type User = {
-    id: number;
-    name: string;
-    email: string;
-    avatar?: string;
-    email_verified_at: string | null;
-    created_at: string;
-    updated_at: string;
-    [key: string]: unknown;
-};
+export interface User {
+  id: number
+  name: string
+  email: string
+  avatar?: string
+  email_verified_at: string | null
+  created_at: string
+  updated_at: string
+  [key: string]: unknown
+}
 
-export type Auth = {
-    user: User;
-};
+export interface Auth {
+  user: User
+}
 
-export type TwoFactorConfigContent = {
-    title: string;
-    description: string;
-    buttonText: string;
-};
+export interface TwoFactorConfigContent {
+  title: string
+  description: string
+  buttonText: string
+}

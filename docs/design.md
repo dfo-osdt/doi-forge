@@ -54,28 +54,28 @@ Dedicated repository platforms (Dataverse, DSpace, Zenodo etc.) solve this probl
 
 ### 3.1 Stack
 
-| Component                   | Technology                                                |
-| --------------------------- | --------------------------------------------------------- |
-| Backend framework           | Laravel 13                                                |
-| Frontend framework          | Vue 3 + Inertia.js                                        |
-| Frontend language           | TypeScript (strict mode)                                  |
-| UI components               | shadcn-vue                                                |
+| Component                   | Technology                                                    |
+| --------------------------- | ------------------------------------------------------------- |
+| Backend framework           | Laravel 13                                                    |
+| Frontend framework          | Vue 3 + Inertia.js                                            |
+| Frontend language           | TypeScript (strict mode)                                      |
+| UI components               | shadcn-vue                                                    |
 | Route/action bindings       | Laravel Wayfinder (auto-generated TypeScript route functions) |
 | Data objects / TypeScript   | Spatie Laravel Data + TypeScript Transformer                  |
-| Database                    | SQLite                                                    |
-| Authentication (production) | Microsoft Entra ID via Socialite (Azure provider)         |
-| Authentication (local/dev)  | Laravel Breeze (session-based)                            |
-| API authentication          | Laravel Sanctum (token-based)                             |
-| Permissions                 | Spatie Laravel Permission with Teams                      |
-| Audit logging               | Spatie Laravel Activity Log                               |
-| Job queues                  | Laravel Horizon + Redis                                   |
-| DataCite SDK                | `vincentauger/datacite-php-sdk` (built on Saloon)         |
-| Sierra SDK                  | `vincentauger/sierra-php-sdk` (built on Saloon, optional) |
-| Frontend code quality       | @antfu/eslint-config (linting + formatting)               |
-| Backend code quality        | Larastan (PHPStan level 8), Rector, Laravel Pint          |
-| Testing                     | Pest PHP                                                  |
-| CI/CD                       | GitHub Actions with self-hosted runner                    |
-| Deployment                  | Docker Compose (self-hosted, on-prem VM)                  |
+| Database                    | SQLite                                                        |
+| Authentication (production) | Microsoft Entra ID via Socialite (Azure provider)             |
+| Authentication (local/dev)  | Laravel Breeze (session-based)                                |
+| API authentication          | Laravel Sanctum (token-based)                                 |
+| Permissions                 | Spatie Laravel Permission with Teams                          |
+| Audit logging               | Spatie Laravel Activity Log                                   |
+| Job queues                  | Laravel Horizon + Redis                                       |
+| DataCite SDK                | `vincentauger/datacite-php-sdk` (built on Saloon)             |
+| Sierra SDK                  | `vincentauger/sierra-php-sdk` (built on Saloon, optional)     |
+| Frontend code quality       | @antfu/eslint-config (linting + formatting)                   |
+| Backend code quality        | Larastan (PHPStan level 8), Rector, Laravel Pint              |
+| Testing                     | Pest PHP                                                      |
+| CI/CD                       | GitHub Actions with self-hosted runner                        |
+| Deployment                  | Docker Compose (self-hosted, on-prem VM)                      |
 
 ### 3.2 High-Level Design
 
@@ -450,16 +450,16 @@ POST /api/v1/repositories/{repository}/dois/draft
 
 ```json
 {
-    "profile": "journal-article",
-    "submitted_by": "john.doe@dfo-mpo.gc.ca",
-    "metadata": {
-        "titles": [
-            { "title": "My Report Title", "lang": "en" },
-            { "title": "Titre de mon rapport", "lang": "fr" }
-        ],
-        "creators": [{ "name": "Smith, John" }],
-        "publicationYear": 2026
-    }
+  "profile": "journal-article",
+  "submitted_by": "john.doe@dfo-mpo.gc.ca",
+  "metadata": {
+    "titles": [
+      { "title": "My Report Title", "lang": "en" },
+      { "title": "Titre de mon rapport", "lang": "fr" }
+    ],
+    "creators": [{ "name": "Smith, John" }],
+    "publicationYear": 2026
+  }
 }
 ```
 
@@ -467,9 +467,9 @@ POST /api/v1/repositories/{repository}/dois/draft
 
 ```json
 {
-    "doi": "10.1234/abc-xyz",
-    "state": "draft",
-    "id": 42
+  "doi": "10.1234/abc-xyz",
+  "state": "draft",
+  "id": 42
 }
 ```
 
@@ -624,16 +624,16 @@ Certain metadata fields (titles, descriptions) require bilingual input when the 
 
 ## 13. Code Quality
 
-| Tool                             | Purpose                                                                    |
-| -------------------------------- | -------------------------------------------------------------------------- |
-| Larastan (PHPStan level 8)       | Static analysis, PHP type safety                                           |
-| Rector                           | Automated refactoring, PHP version upgrades                                |
-| Laravel Pint                     | PHP code style (PSR-12)                                                    |
-| @antfu/eslint-config             | Frontend linting, formatting, and code style (replaces Prettier + ESLint)  |
-| TypeScript strict mode + vue-tsc | Frontend type safety                                                       |
-| Wayfinder                        | Auto-generated TypeScript route/action functions                           |
-| Spatie Laravel Data              | Typed Data objects, colocated validation, auto-generated TypeScript         |
-| Pest PHP                         | Testing — unit, feature, integration                                       |
+| Tool                             | Purpose                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------- |
+| Larastan (PHPStan level 8)       | Static analysis, PHP type safety                                          |
+| Rector                           | Automated refactoring, PHP version upgrades                               |
+| Laravel Pint                     | PHP code style (PSR-12)                                                   |
+| @antfu/eslint-config             | Frontend linting, formatting, and code style (replaces Prettier + ESLint) |
+| TypeScript strict mode + vue-tsc | Frontend type safety                                                      |
+| Wayfinder                        | Auto-generated TypeScript route/action functions                          |
+| Spatie Laravel Data              | Typed Data objects, colocated validation, auto-generated TypeScript       |
+| Pest PHP                         | Testing — unit, feature, integration                                      |
 
 All pull requests must pass static analysis and the full test suite via GitHub Actions before merge.
 
@@ -843,17 +843,17 @@ GitHub Actions with a self-hosted runner on the same on-prem VM. Pipeline:
 3. Wayfinder generation (`wayfinder:generate`) + TypeScript type check (`vue-tsc --noEmit`)
 4. Pest test suite
 5. Deploy:
-    ```bash
-    composer install --no-dev --optimize-autoloader
-    npm ci && npm run build
-    php artisan wayfinder:generate
-    php artisan migrate --force
-    php artisan config:cache
-    php artisan route:cache
-    php artisan view:cache
-    sudo supervisorctl restart horizon
-    sudo service php8.4-fpm reload
-    ```
+   ```bash
+   composer install --no-dev --optimize-autoloader
+   npm ci && npm run build
+   php artisan wayfinder:generate
+   php artisan migrate --force
+   php artisan config:cache
+   php artisan route:cache
+   php artisan view:cache
+   sudo supervisorctl restart horizon
+   sudo service php8.4-fpm reload
+   ```
 
 ---
 

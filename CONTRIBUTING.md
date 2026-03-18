@@ -37,7 +37,7 @@ Breaking changes must include `!` after the type or a `BREAKING CHANGE:` footer.
 
 **Do not post any security issues on the public repository!** See [SECURITY.md](SECURITY.md)
 
-______________________
+---
 
 ## Comment contribuer
 
