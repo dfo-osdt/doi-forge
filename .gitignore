@@ -28,4 +28,5 @@ yarn-error.log
 /.zed
 /.agents
 /.claude
+/.mcp.json
 /opencode.json
