@@ -8,4 +8,7 @@ export default antfu({
     'resources/ts/routes/**',
     'resources/ts/wayfinder/**',
   ],
+  rules: {
+    'markdown/no-multiple-h1': 'off',
+  },
 })
