@@ -1,0 +1,14 @@
+pre-commit:
+  parallel: true
+  commands:
+    pint:
+      glob: "*.php"
+      run: vendor/bin/pint {staged_files}
+    eslint:
+      glob: "*.{ts,vue,js}"
+      run: pnpm eslint --fix {staged_files}
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm commitlint --edit {1}

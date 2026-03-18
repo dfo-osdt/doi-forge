@@ -626,7 +626,7 @@ Certain metadata fields (titles, descriptions) require bilingual input when the 
 
 | Tool                             | Purpose                                                                   |
 | -------------------------------- | ------------------------------------------------------------------------- |
-| Larastan (PHPStan level 8)       | Static analysis, PHP type safety                                          |
+| Larastan (PHPStan level 5)       | Static analysis, PHP type safety                                          |
 | Rector                           | Automated refactoring, PHP version upgrades                               |
 | Laravel Pint                     | PHP code style (PSR-12)                                                   |
 | @antfu/eslint-config             | Frontend linting, formatting, and code style (replaces Prettier + ESLint) |
@@ -843,6 +843,7 @@ GitHub Actions with a self-hosted runner on the same on-prem VM. Pipeline:
 3. Wayfinder generation (`wayfinder:generate`) + TypeScript type check (`vue-tsc --noEmit`)
 4. Pest test suite
 5. Deploy:
+
    ```bash
    composer install --no-dev --optimize-autoloader
    npm ci && npm run build
