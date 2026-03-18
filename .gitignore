@@ -26,5 +26,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+/.agents
 /.claude
 /opencode.json
