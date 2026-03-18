@@ -44,12 +44,10 @@ const { t } = useI18n()
         10.XXXX/doi-forge
       </div>
       <nav class="flex items-center gap-2">
-        <AppearanceToggle />
-        <LocaleSwitcher />
         <template v-if="$page.props.auth.user">
           <Link
             :href="dashboard()"
-            class="ml-2 inline-flex items-center rounded-sm border border-[#19140035] px-4 py-1.5 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
+            class="inline-flex items-center rounded-sm border border-forge/40 px-4 py-1.5 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-forge dark:text-[#EDEDEC]"
           >
             {{ t('welcome.dashboard') }}
           </Link>
@@ -57,18 +55,20 @@ const { t } = useI18n()
         <template v-else>
           <Link
             :href="login()"
-            class="ml-2 inline-flex items-center rounded-sm border border-transparent px-4 py-1.5 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-[#19140035] dark:text-[#EDEDEC] dark:hover:border-[#3E3E3A]"
+            class="inline-flex items-center rounded-sm border border-transparent px-4 py-1.5 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-forge/40 dark:text-[#EDEDEC]"
           >
             {{ t('log-in') }}
           </Link>
           <Link
             v-if="canRegister"
             :href="register()"
-            class="inline-flex items-center rounded-sm border border-[#19140035] px-4 py-1.5 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
+            class="inline-flex items-center rounded-sm border border-forge/40 px-4 py-1.5 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-forge dark:text-[#EDEDEC]"
           >
             {{ t('register') }}
           </Link>
         </template>
+        <AppearanceToggle />
+        <LocaleSwitcher />
       </nav>
     </header>
 
@@ -76,9 +76,9 @@ const { t } = useI18n()
     <main class="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
       <!-- Decorative rule -->
       <div class="mb-10 flex items-center gap-5" aria-hidden="true">
-        <div class="h-px w-20 bg-gradient-to-r from-transparent via-[#1b1b18]/20 to-[#1b1b18]/30 dark:via-[#b8964e]/20 dark:to-[#b8964e]/30" />
-        <AppLogoIcon class="size-14 text-[#706f6c] dark:text-[#A1A09A]" />
-        <div class="h-px w-20 bg-gradient-to-l from-transparent via-[#1b1b18]/20 to-[#1b1b18]/30 dark:via-[#b8964e]/20 dark:to-[#b8964e]/30" />
+        <div class="h-px w-20 bg-gradient-to-r from-transparent via-forge/30 to-forge/50" />
+        <AppLogoIcon class="size-14 text-forge" />
+        <div class="h-px w-20 bg-gradient-to-l from-transparent via-forge/30 to-forge/50" />
       </div>
 
       <!-- Wordmark -->
@@ -98,7 +98,7 @@ const { t } = useI18n()
       <template v-if="$page.props.auth.user">
         <Link
           :href="dashboard()"
-          class="inline-flex items-center rounded-sm border border-[#19140035] px-8 py-3 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
+          class="inline-flex items-center rounded-sm border border-forge/40 px-8 py-3 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-forge dark:text-[#EDEDEC]"
         >
           {{ t('welcome.dashboard') }}
         </Link>
@@ -106,7 +106,7 @@ const { t } = useI18n()
       <template v-else>
         <Link
           :href="login()"
-          class="inline-flex items-center rounded-sm border border-[#19140035] px-8 py-3 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
+          class="inline-flex items-center rounded-sm border border-forge/40 px-8 py-3 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-forge dark:text-[#EDEDEC]"
         >
           {{ t('log-in') }}
         </Link>
