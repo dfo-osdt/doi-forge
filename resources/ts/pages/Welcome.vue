@@ -76,9 +76,9 @@ const { t } = useI18n()
     <main class="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
       <!-- Decorative rule -->
       <div class="mb-10 flex items-center gap-5" aria-hidden="true">
-        <div class="h-px w-20 bg-gradient-to-r from-transparent via-forge/30 to-forge/50" />
+        <div class="h-px w-20 bg-linear-to-r from-transparent via-forge/30 to-forge/50" />
         <AppLogoIcon class="size-14 text-forge" />
-        <div class="h-px w-20 bg-gradient-to-l from-transparent via-forge/30 to-forge/50" />
+        <div class="h-px w-20 bg-linear-to-l from-transparent via-forge/30 to-forge/50" />
       </div>
 
       <!-- Wordmark -->
