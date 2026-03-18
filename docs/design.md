@@ -846,7 +846,7 @@ GitHub Actions with a self-hosted runner on the same on-prem VM. Pipeline:
 
    ```bash
    composer install --no-dev --optimize-autoloader
-   npm ci && npm run build
+   pnpm ci && pnpm run build
    php artisan wayfinder:generate
    php artisan migrate --force
    php artisan config:cache
