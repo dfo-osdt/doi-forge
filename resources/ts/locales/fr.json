@@ -5,5 +5,10 @@
     "light": "Clair",
     "dark": "Sombre",
     "system": "Système"
+  },
+  "welcome": {
+    "dashboard": "Tableau de bord",
+    "tagline": "Gouvernance des DOI pour les institutions de recherche.",
+    "description": "Contrôle d'accès multi-utilisateurs, flux d'approbation et traçabilité complète — intégré avec DataCite."
   }
 }

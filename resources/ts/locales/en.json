@@ -5,5 +5,10 @@
     "light": "Light",
     "dark": "Dark",
     "system": "System"
+  },
+  "welcome": {
+    "dashboard": "Dashboard",
+    "tagline": "DOI governance and orchestration for research institutions.",
+    "description": "Multi-user access control, approval workflows, and a complete audit trail — built on DataCite."
   }
 }
