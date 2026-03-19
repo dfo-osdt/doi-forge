@@ -62,7 +62,7 @@ Dedicated repository platforms (Dataverse, DSpace, Zenodo etc.) solve this probl
 | UI components               | shadcn-vue                                                    |
 | Route/action bindings       | Laravel Wayfinder (auto-generated TypeScript route functions) |
 | Data objects / TypeScript   | Spatie Laravel Data + TypeScript Transformer                  |
-| Database                    | SQLite                                                        |
+| Database                    | PostgreSQL 18                                                 |
 | Authentication (production) | Microsoft Entra ID via Socialite (Azure provider)             |
 | Authentication (local/dev)  | Laravel Breeze (session-based)                                |
 | API authentication          | Laravel Sanctum (token-based)                                 |
@@ -160,8 +160,6 @@ Profiles are PHP classes in `app/Profiles/` — not stored in the database. The 
 
 All tables use integer primary keys. Enumeration is not a concern — authentication and authorization prevent unauthorized access regardless of ID guessability. The DOI string itself (`10.1234/abc-xyz`) is the meaningful external identifier and is always returned in API responses.
 
-The database is a single SQLite file — trivial to back up (`cp doi-forge.sqlite backup/`) and requires no database server in the Docker Compose stack.
-
 DOI browsing and detail views query the DataCite API directly via the SDK.
 
 ---
@@ -190,11 +188,12 @@ A profile is a PHP class in `app/Profiles/`. Its sole job is to initialise the f
 
 Profiles are not stored in the database. They live in the codebase, reviewed via PR, fully type-checked by Larastan.
 
-**A profile does three things only:**
+**A profile does four things only:**
 
 - `defaults()` — pre-fills `form_data` with DataCite-shaped JSON when a new DOI is started
 - `required()` — which fields must be present for form validation
 - `hidden()` — which DataCite fields to hide from the form entirely
+- `validators()` — which validators must pass before the DOI can be published (see §4.3)
 
 ```php
 final class CanadianTechReportProfile extends BaseProfile
@@ -247,16 +246,115 @@ final class CanadianTechReportProfile extends BaseProfile
     {
         return ['geoLocations', 'fundingReferences'];
     }
+
+    public function validators(): array
+    {
+        return [DataCiteRecommendedFieldsValidator::class];
+    }
 }
 ```
 
-The profile only participates at two moments: when a new DOI is created (`defaults()` pre-fills the form) and when the form is submitted (`required()` informs validation). After that it is irrelevant — the user's `form_data` is the truth.
+The profile participates at three moments: when a new DOI is created (`defaults()` pre-fills the form), when the form is submitted (`required()` informs validation), and when an approver attempts to publish (`validators()` are evaluated as a publication gate). After the first moment it is otherwise irrelevant — the user's `form_data` is the truth.
 
-### 4.3 User
+### 4.3 Validators
+
+Validators express metadata quality rules that must pass before a DOI can be published. They are distinct from `required()` — required fields are a submission gate enforced by the editor, validators are a publication gate enforced at approval time.
+
+Validators are PHP classes in `app/Validators/`. Like profiles, they live in code: reviewed via PR, fully type-checked by Larastan, version-controlled.
+
+**Two attachment points:**
+
+- **Profile-level** — a profile declares its own validators via `validators()`. Applies to DOIs started with that profile.
+- **Repository-level** — an admin can configure validators that apply to all DOIs on a repository regardless of profile, covering institutional compliance floors (e.g. a GC Open Government minimum that every repository must meet).
+
+Both sets are evaluated together at approval time.
+
+**Two severity levels:**
+
+- `error` — hard block. The approver cannot publish until the condition is resolved. The DOI must be rejected back to the editor.
+- `warning` — advisory. The approver sees the issue and must explicitly acknowledge it before approving. Does not block publication on its own.
+
+**Interface:**
+
+Validators receive a `DoiFormData` DTO — the same Spatie Data object constructed via `DoiFormData::from($doi->form_data)` that is passed to the DataCite SDK. This gives validators fully typed, IDE-navigable access to the nested DataCite shape rather than raw array access.
+
+```php
+interface ValidatorInterface
+{
+    /** Human-readable name shown in the approver UI. */
+    public function name(): string;
+
+    /** @return ValidationResult[] */
+    public function validate(DoiFormData $data): array;
+}
+```
+
+```php
+final class ValidationResult
+{
+    public function __construct(
+        public readonly ValidationSeverity $severity, // Error | Warning
+        public readonly string $field,
+        public readonly string $message,
+    ) {}
+
+    public static function error(string $field, string $message): self { ... }
+    public static function warning(string $field, string $message): self { ... }
+}
+```
+
+**Example:**
+
+```php
+final class DataCiteRecommendedFieldsValidator implements ValidatorInterface
+{
+    public function name(): string
+    {
+        return 'DataCite Recommended Fields';
+    }
+
+    public function validate(DoiFormData $data): array
+    {
+        $results = [];
+
+        if ($data->descriptions->isEmpty()) {
+            $results[] = ValidationResult::warning('descriptions', 'At least one description is strongly recommended by DataCite.');
+        }
+
+        $hasNameIdentifier = $data->creators
+            ->some(fn (CreatorData $creator) => $creator->nameIdentifiers->isNotEmpty());
+
+        if (!$hasNameIdentifier) {
+            $results[] = ValidationResult::warning('creators', 'At least one creator should have a name identifier (e.g. ORCID).');
+        }
+
+        return $results;
+    }
+}
+```
+
+The DTO has already been constructed and validated by the time validators run — there is no redundant `DoiFormData::from()` call. The same instance used for the DataCite SDK call is passed to each validator.
+
+**Where validators run:**
+
+1. **At submission (advisory)** — validator results are computed and surfaced to the editor so they can address issues before the DOI reaches the approver's inbox. Does not block submission.
+2. **At approval (gate)** — validators run again before the approval is processed. Any `error`-level result blocks approval. `warning`-level results are shown to the approver, who must acknowledge each one before the approval proceeds.
+
+Running validators at submission gives editors early feedback. Running them again at approval ensures the gate is enforced on the final `form_data` state, not whatever the editor saw when they originally submitted.
+
+**Approver UI:**
+
+The approval view shows a validator results panel. Errors are listed with a clear block indicator. Warnings have an acknowledgement checkbox per item. The Approve button is disabled until all errors are resolved and all warnings acknowledged.
+
+**Activity log:**
+
+Acknowledged warnings are recorded in the activity log at approval time — which warnings were present, and that the approver acknowledged them. This provides an audit trail for deliberate decisions to publish with known metadata gaps.
+
+### 4.4 User
 
 Created automatically on first Entra ID login. No roles are assigned on creation — an admin must explicitly grant repository access and assign a role (observer by default). In local/dev mode, Breeze-style authentication is used with the same user model.
 
-### 4.4 DOI Record
+### 4.5 DOI Record
 
 A DOI record tracks the full lifecycle from initial form composition through publication. The `form_data` column holds DataCite-shaped JSON and is the single source of truth for the metadata — it is autosaved incrementally and passed directly to the SDK on submission.
 
@@ -277,7 +375,7 @@ A DOI record tracks the full lifecycle from initial form composition through pub
 - `url_verification_error` — nullable, populated if verification fails
 - `last_autosaved_at` — timestamp, shown in form UI ("Last saved X ago")
 
-### 4.5 DOI State Machine & Autosave
+### 4.6 DOI State Machine & Autosave
 
 DOI Forge maintains its own application state machine that maps onto — but is distinct from — DataCite's state model.
 
@@ -353,8 +451,15 @@ enum DoiState: string
       pending_approval    url_invalid                  |
       (form locked,      (notifies editor              |
        approver inbox)    to fix URL)                  |
-           /    \                                      |
-     [Approve] [Reject] ──────────────────────────────┘
+           |    \                                      |
+     [Approve]  [Reject] ─────────────────────────────┘
+           |
+    validators run
+    (errors block,
+     warnings require
+     acknowledgement)
+           |
+           v
          |
          v
      published  ──── [Edit published DOI] ───┐
@@ -364,9 +469,11 @@ enum DoiState: string
        |                              (DataCite stays findable,
        |                               form_data holds changes)
        |                                   /    \
-       └──────────── [Approve]            [Reject] → editor fixes
-                  (update metadata                     and resubmits
-                   in DataCite)
+       |                            [Approve]  [Reject] → editor fixes
+       |                                 |            and resubmits
+       |                          validators run
+       └──────────── (pass) ──────(update metadata
+                                   in DataCite)
 ```
 
 **States:**
@@ -807,9 +914,9 @@ The system is designed with Authority to Operate (ATO) and security audit requir
 VM (Ubuntu 24.04 LTS)
   ├── Nginx
   ├── PHP 8.4-FPM
+  ├── PostgreSQL 18
   ├── Redis (Horizon + cache)
-  ├── Supervisor (manages Horizon worker)
-  └── SQLite (single file)
+  └── Supervisor (manages Horizon worker)
 ```
 
 A provisioning shell script and example Nginx/Supervisor configs are provided in `deployment/`. An Ansible playbook is provided for departments that prefer infrastructure-as-code.
@@ -825,7 +932,12 @@ AUTH_PROVIDER=entra
 AZURE_CLIENT_ID=
 AZURE_CLIENT_SECRET=
 AZURE_TENANT_ID=
-DB_CONNECTION=sqlite
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=doi_forge
+DB_USERNAME=doi_forge
+DB_PASSWORD=
 REDIS_HOST=127.0.0.1
 BACKUP_PASSWORD=
 BACKUP_NOTIFICATION_EMAIL=
@@ -833,7 +945,7 @@ BACKUP_NOTIFICATION_EMAIL=
 
 ### 15.3 Backups
 
-Backups are handled by Spatie Laravel Backup. The SQLite database file and application storage are backed up daily, encrypted with AES-256, and shipped to a configured destination disk — S3-compatible object storage, SFTP, or local disk depending on what the department has available.
+Backups are handled by Spatie Laravel Backup. The database and application storage are backed up daily, encrypted with AES-256, and shipped to a configured destination disk — S3-compatible object storage, SFTP, or local disk depending on what the department has available.
 
 ```php
 // Scheduled in routes/console.php
@@ -1168,31 +1280,37 @@ The correct approach is to capture the best available metadata at submission tim
 
 **If this is revisited:** A reliable implementation requires a stable shared author identifier (e.g. a ULID on OSP author records) established at submission time and stored in an `integration_author_links` table owned by the OSP integration handler. This is a non-trivial feature that should be driven by demonstrated post-launch user need, not speculative design.
 
-### 21.2 SQLite over PostgreSQL
+### 21.2 Validators as a Publication Gate, Not a Submission Gate
 
-**Decision:** SQLite is the default database engine.
+**Decision:** Validators block publication at approval time, not submission. They also run at submission to give editors early feedback, but do not prevent a DOI from entering `pending_approval`.
 
-**Rationale:** DOI Forge is a low-write governance tool. A department minting dozens of DOIs per week does not need a database server. SQLite reduces operational complexity, eliminates a service from the deployment stack, and makes backups trivial (single file). Laravel's database abstraction means switching to PostgreSQL is a config change if a deployment genuinely needs it.
+**Rationale:** `required()` already guards submission — the editor cannot submit without mandatory fields. Validators express a higher standard: quality rules, recommended metadata, institutional compliance minimums. Blocking submission on validators would punish editors for partially complete drafts and create friction in legitimate workflows (e.g. an editor submitting for review knowing a colleague will look up the ORCID before approval). Placing the hard gate at approval keeps editorial flow unimpeded while ensuring nothing reaches DataCite without meeting the quality bar. The approver — not the editor — is the last line of defence before a DOI becomes findable, which is the appropriate place for a publication standard to be enforced.
 
-### 21.3 No Event Sourcing
+### 21.3 PostgreSQL over SQLite
+
+**Decision:** PostgreSQL 18 is the database engine.
+
+**Rationale:** DOI Forge runs queue workers (Horizon) alongside web request handlers concurrently. SQLite's file-level write lock creates contention under that pattern — a background URL verification job and an autosave request will collide. PostgreSQL handles concurrent writers cleanly. It also provides proper JSON operators for querying `form_data`, full-text search if needed later, and production parity that prevents the class of bugs where SQLite's more permissive type coercion and case-insensitive `LIKE` mask issues that surface in production. Spatie Laravel Backup handles PostgreSQL dumps natively, so operational complexity is equivalent.
+
+### 21.4 No Event Sourcing
 
 **Decision:** Standard Eloquent models with Spatie Activity Log, not event sourcing.
 
 **Rationale:** The audit requirements are real but well served by Spatie Activity Log combined with DataCite's own activity log. Event sourcing was considered (Laravel Verbs) but rejected because: the domain is simple, replay is never needed independently of DataCite, externally minted DOIs have no event history creating an impedance mismatch, and the operational and contribution overhead is not justified by the benefits.
 
-### 21.4 Profiles as Code, Not Data
+### 21.5 Profiles as Code, Not Data
 
 **Decision:** Metadata profiles are PHP classes, not database records.
 
 **Rationale:** Profiles change infrequently and for deliberate reasons. Keeping them in code means changes are reviewed via PR, typed and validated by Larastan, and version-controlled alongside the application. A profile builder UI is out of scope for v1 — when it is built, the storage question reopens.
 
-### 21.5 Spatie Laravel Data + Wayfinder Stable for Type Safety
+### 21.6 Spatie Laravel Data + Wayfinder Stable for Type Safety
 
 **Decision:** Use Spatie Laravel Data for typed Data objects with colocated validation and auto-generated TypeScript (via TypeScript Transformer). Use Wayfinder stable for typed route/action functions. The SDK (`datacite-php-sdk`) remains framework-agnostic — Data classes live in DOI Forge only.
 
 **Rationale:** The DataCite metadata shape is deeply nested. Writing validation as flat FormRequest rule arrays is verbose and error-prone for structures like `creators[].nameIdentifiers[]` and `relatedItems[].contributors[]`. Data classes provide colocated validation on each nested structure, clean controller type-hints, and auto-generated TypeScript for all page props, form payloads, and API responses — not just the DataCite shape. This eliminates manually maintained TypeScript files entirely. Wayfinder `next` was considered but rejected because as of March 2026 it remains in beta with an unstable API and known performance issues. This can be revisited when it reaches a stable release.
 
-### 21.6 form_data as Pure DataCite JSON
+### 21.7 form_data as Pure DataCite JSON
 
 **Decision:** The `form_data` column on the `dois` table contains DataCite-shaped JSON only. No internal identifiers (OSP author IDs etc.) are stored there.
 
