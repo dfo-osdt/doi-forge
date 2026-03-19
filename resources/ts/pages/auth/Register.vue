@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Form, Head } from '@inertiajs/vue3'
+import { useI18n } from 'vue-i18n'
 import InputError from '@/components/InputError.vue'
 import PasswordInput from '@/components/PasswordInput.vue'
 import TextLink from '@/components/TextLink.vue'
@@ -10,14 +11,16 @@ import { Spinner } from '@/components/ui/spinner'
 import AuthBase from '@/layouts/AuthLayout.vue'
 import { login } from '@/routes'
 import { store } from '@/routes/register'
+
+const { t } = useI18n()
 </script>
 
 <template>
   <AuthBase
-    title="Create an account"
-    description="Enter your details below to create your account"
+    :title="t('auth.register.title')"
+    :description="t('auth.register.description')"
   >
-    <Head title="Register" />
+    <Head :title="t('auth.register.head')" />
 
     <Form
       v-slot="{ errors, processing }"
@@ -27,7 +30,7 @@ import { store } from '@/routes/register'
     >
       <div class="grid gap-6">
         <div class="grid gap-2">
-          <Label for="first_name">First name</Label>
+          <Label for="first_name">{{ t('auth.register.first-name') }}</Label>
           <Input
             id="first_name"
             type="text"
@@ -36,13 +39,13 @@ import { store } from '@/routes/register'
             :tabindex="1"
             autocomplete="given-name"
             name="first_name"
-            placeholder="First name"
+            :placeholder="t('auth.register.first-name')"
           />
           <InputError :message="errors.first_name" />
         </div>
 
         <div class="grid gap-2">
-          <Label for="last_name">Last name</Label>
+          <Label for="last_name">{{ t('auth.register.last-name') }}</Label>
           <Input
             id="last_name"
             type="text"
@@ -50,13 +53,13 @@ import { store } from '@/routes/register'
             :tabindex="2"
             autocomplete="family-name"
             name="last_name"
-            placeholder="Last name"
+            :placeholder="t('auth.register.last-name')"
           />
           <InputError :message="errors.last_name" />
         </div>
 
         <div class="grid gap-2">
-          <Label for="email">Email address</Label>
+          <Label for="email">{{ t('auth.register.email-address') }}</Label>
           <Input
             id="email"
             type="email"
@@ -70,27 +73,27 @@ import { store } from '@/routes/register'
         </div>
 
         <div class="grid gap-2">
-          <Label for="password">Password</Label>
+          <Label for="password">{{ t('auth.register.password') }}</Label>
           <PasswordInput
             id="password"
             required
             :tabindex="4"
             autocomplete="new-password"
             name="password"
-            placeholder="Password"
+            :placeholder="t('auth.register.password')"
           />
           <InputError :message="errors.password" />
         </div>
 
         <div class="grid gap-2">
-          <Label for="password_confirmation">Confirm password</Label>
+          <Label for="password_confirmation">{{ t('auth.register.confirm-password') }}</Label>
           <PasswordInput
             id="password_confirmation"
             required
             :tabindex="5"
             autocomplete="new-password"
             name="password_confirmation"
-            placeholder="Confirm password"
+            :placeholder="t('auth.register.confirm-password')"
           />
           <InputError :message="errors.password_confirmation" />
         </div>
@@ -103,18 +106,18 @@ import { store } from '@/routes/register'
           data-test="register-user-button"
         >
           <Spinner v-if="processing" />
-          Create account
+          {{ t('auth.register.create-account') }}
         </Button>
       </div>
 
       <div class="text-center text-sm text-muted-foreground">
-        Already have an account?
+        {{ t('auth.register.have-account') }}
         <TextLink
           :href="login()"
           class="underline underline-offset-4"
           :tabindex="7"
         >
-          Log in
+          {{ t('auth.register.log-in') }}
         </TextLink>
       </div>
     </Form>

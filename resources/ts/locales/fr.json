@@ -10,5 +10,76 @@
     "dashboard": "Tableau de bord",
     "tagline": "Gouvernance des DOI pour les institutions de recherche.",
     "description": "Contrôle d'accès multi-utilisateurs, flux d'approbation et traçabilité complète — intégré avec DataCite."
+  },
+  "auth": {
+    "login": {
+      "title": "Connectez-vous à votre compte",
+      "description": "Entrez votre courriel et mot de passe ci-dessous pour vous connecter",
+      "head": "Connexion",
+      "email-address": "Adresse courriel",
+      "password": "Mot de passe",
+      "forgot-password": "Mot de passe oublié?",
+      "remember-me": "Se souvenir de moi",
+      "no-account": "Vous n'avez pas de compte?",
+      "sign-up": "S'inscrire"
+    },
+    "register": {
+      "title": "Créer un compte",
+      "description": "Entrez vos informations ci-dessous pour créer votre compte",
+      "head": "Inscription",
+      "first-name": "Prénom",
+      "last-name": "Nom de famille",
+      "email-address": "Adresse courriel",
+      "password": "Mot de passe",
+      "confirm-password": "Confirmer le mot de passe",
+      "create-account": "Créer un compte",
+      "have-account": "Vous avez déjà un compte?",
+      "log-in": "Se connecter"
+    },
+    "forgot-password": {
+      "title": "Mot de passe oublié",
+      "description": "Entrez votre courriel pour recevoir un lien de réinitialisation",
+      "head": "Mot de passe oublié",
+      "email-address": "Adresse courriel",
+      "send-link": "Envoyer le lien de réinitialisation",
+      "return-to": "Ou, retourner à la",
+      "log-in": "connexion"
+    },
+    "reset-password": {
+      "title": "Réinitialiser le mot de passe",
+      "description": "Veuillez entrer votre nouveau mot de passe ci-dessous",
+      "head": "Réinitialiser le mot de passe",
+      "email": "Courriel",
+      "password": "Mot de passe",
+      "confirm-password": "Confirmer le mot de passe",
+      "button": "Réinitialiser le mot de passe"
+    },
+    "confirm-password": {
+      "title": "Confirmez votre mot de passe",
+      "description": "Il s'agit d'une zone sécurisée de l'application. Veuillez confirmer votre mot de passe avant de continuer.",
+      "head": "Confirmer le mot de passe",
+      "password": "Mot de passe",
+      "button": "Confirmer le mot de passe"
+    },
+    "verify-email": {
+      "title": "Vérifier le courriel",
+      "description": "Veuillez vérifier votre adresse courriel en cliquant sur le lien que nous venons de vous envoyer.",
+      "head": "Vérification du courriel",
+      "verification-sent": "Un nouveau lien de vérification a été envoyé à l'adresse courriel que vous avez fournie lors de l'inscription.",
+      "resend": "Renvoyer le courriel de vérification",
+      "log-out": "Se déconnecter"
+    },
+    "two-factor": {
+      "head": "Authentification à deux facteurs",
+      "recovery-title": "Code de récupération",
+      "recovery-description": "Veuillez confirmer l'accès à votre compte en entrant l'un de vos codes de récupération d'urgence.",
+      "recovery-toggle": "se connecter avec un code d'authentification",
+      "code-title": "Code d'authentification",
+      "code-description": "Entrez le code d'authentification fourni par votre application d'authentification.",
+      "code-toggle": "se connecter avec un code de récupération",
+      "continue": "Continuer",
+      "or-you-can": "ou vous pouvez",
+      "placeholder-recovery": "Entrez le code de récupération"
+    }
   }
 }
