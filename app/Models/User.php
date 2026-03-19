@@ -7,17 +7,28 @@ use App\Enums\SupportedLocale;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['name', 'email', 'password', 'locale'])]
+#[Fillable(['first_name', 'last_name', 'email', 'password', 'locale'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
+
+    /**
+     * @return Attribute<string, never>
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => "{$this->first_name} {$this->last_name}",
+        );
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -27,6 +38,7 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'active' => 'boolean',
             'email_verified_at' => 'datetime',
             'locale' => SupportedLocale::class,
             'password' => 'hashed',

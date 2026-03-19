@@ -3,7 +3,6 @@ import type { BreadcrumbItem } from '@/types'
 import { Form, Head, Link, usePage } from '@inertiajs/vue3'
 import { computed } from 'vue'
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController'
-import DeleteUser from '@/components/DeleteUser.vue'
 import Heading from '@/components/Heading.vue'
 import InputError from '@/components/InputError.vue'
 import { Button } from '@/components/ui/button'
@@ -45,7 +44,7 @@ const user = computed(() => page.props.auth.user)
         <Heading
           variant="small"
           title="Profile information"
-          description="Update your name and email address"
+          description="Update your name and email address."
         />
 
         <Form
@@ -54,17 +53,31 @@ const user = computed(() => page.props.auth.user)
           class="space-y-6"
         >
           <div class="grid gap-2">
-            <Label for="name">Name</Label>
+            <Label for="first_name">First name</Label>
             <Input
-              id="name"
+              id="first_name"
               class="mt-1 block w-full"
-              name="name"
-              :default-value="user.name"
+              name="first_name"
+              :default-value="user.first_name"
               required
-              autocomplete="name"
-              placeholder="Full name"
+              autocomplete="given-name"
+              placeholder="First name"
             />
-            <InputError class="mt-2" :message="errors.name" />
+            <InputError class="mt-2" :message="errors.first_name" />
+          </div>
+
+          <div class="grid gap-2">
+            <Label for="last_name">Last name</Label>
+            <Input
+              id="last_name"
+              class="mt-1 block w-full"
+              name="last_name"
+              :default-value="user.last_name"
+              required
+              autocomplete="family-name"
+              placeholder="Last name"
+            />
+            <InputError class="mt-2" :message="errors.last_name" />
           </div>
 
           <div class="grid gap-2">
@@ -128,7 +141,6 @@ const user = computed(() => page.props.auth.user)
         </Form>
       </div>
 
-      <DeleteUser />
     </SettingsLayout>
   </AppLayout>
 </template>
