@@ -135,7 +135,7 @@ The SDK enums (`DoiState`, `RelationType`, `ResourceTypeGeneral` etc.) are PHP e
 
 The Vue form holds DataCite-shaped data natively — `titles`, `creators`, `descriptions`, `relatedItems` etc. match the SDK structure exactly. The `relatedItems` field captures rich relationships between research objects — a publication linked to its underlying dataset, a report that supersedes a previous one, a translation of an existing work. These relationships are first-class metadata in DataCite and surfaced prominently in the DOI Forge form. There is no translation layer between what the component holds, what gets posted, and what the SDK receives.
 
-`form_data` in the database is this same JSON. Loading a draft back into the form is `DoiFormData::from($doi->form_data)` on the backend and typed props on the frontend — no dehydration needed.
+`form_data` in the database is this same JSON. Loading a draft back into the form is `DoiData::from($doi->form_data)` on the backend and typed props on the frontend — no dehydration needed.
 
 **Profile initialises, Vue owns:**
 
@@ -276,7 +276,7 @@ Both sets are evaluated together at approval time.
 
 **Interface:**
 
-Validators receive a `DoiFormData` DTO — the same Spatie Data object constructed via `DoiFormData::from($doi->form_data)` that is passed to the DataCite SDK. This gives validators fully typed, IDE-navigable access to the nested DataCite shape rather than raw array access.
+Validators receive a `DoiData` DTO — the same Spatie Data object constructed via `DoiData::from($doi->form_data)` that is passed to the DataCite SDK. This gives validators fully typed, IDE-navigable access to the nested DataCite shape rather than raw array access.
 
 ```php
 interface ValidatorInterface
@@ -285,7 +285,7 @@ interface ValidatorInterface
     public function name(): string;
 
     /** @return ValidationResult[] */
-    public function validate(DoiFormData $data): array;
+    public function validate(DoiData $data): array;
 }
 ```
 
@@ -313,7 +313,7 @@ final class DataCiteRecommendedFieldsValidator implements ValidatorInterface
         return 'DataCite Recommended Fields';
     }
 
-    public function validate(DoiFormData $data): array
+    public function validate(DoiData $data): array
     {
         $results = [];
 
@@ -333,7 +333,7 @@ final class DataCiteRecommendedFieldsValidator implements ValidatorInterface
 }
 ```
 
-The DTO has already been constructed and validated by the time validators run — there is no redundant `DoiFormData::from()` call. The same instance used for the DataCite SDK call is passed to each validator.
+The DTO has already been constructed and validated by the time validators run — there is no redundant `DoiData::from()` call. The same instance used for the DataCite SDK call is passed to each validator.
 
 **Where validators run:**
 
@@ -494,7 +494,7 @@ enum DoiState: string
 ```
 Vue form_data (DataCite-shaped JSON)
     ↓ POST
-DoiFormData (Spatie Data — validates + hydrates)
+DoiData (Spatie Data — validates + hydrates)
     ↓
 $data->toArray() → CreateDOIInput::fromArray(...)
     ↓
