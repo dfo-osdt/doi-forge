@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3'
 import { useI18n } from 'vue-i18n'
-import AppearanceToggle from '@/components/AppearanceToggle.vue'
 import AppDoiBadge from '@/components/AppDoiBadge.vue'
+import AppearanceToggle from '@/components/AppearanceToggle.vue'
 import AppLogoIcon from '@/components/AppLogoIcon.vue'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import { dashboard, login, register } from '@/routes'
@@ -20,13 +20,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <Head title="Welcome">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&display=swap"
-      rel="stylesheet"
-    >
-  </Head>
+  <Head title="Welcome" />
 
   <div class="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
     <!-- Subtle dot-grid background -->
@@ -78,8 +72,7 @@ const { t } = useI18n()
 
       <!-- Wordmark -->
       <h1
-        class="mb-6 text-[clamp(4rem,12vw,8rem)] leading-none tracking-tight text-foreground"
-        style="font-family: 'DM Serif Display', serif;"
+        class="mb-6 font-serif text-[clamp(4rem,12vw,8rem)] leading-none tracking-tight text-foreground"
       >
         DOI Forge
       </h1>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { BreadcrumbItem } from '@/types'
+import AppearanceToggle from '@/components/AppearanceToggle.vue'
 import Breadcrumbs from '@/components/Breadcrumbs.vue'
+import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 
 withDefaults(
@@ -22,6 +24,10 @@ withDefaults(
       <template v-if="breadcrumbs && breadcrumbs.length > 0">
         <Breadcrumbs :breadcrumbs="breadcrumbs" />
       </template>
+    </div>
+    <div class="ml-auto flex items-center gap-2">
+      <AppearanceToggle />
+      <LocaleSwitcher />
     </div>
   </header>
 </template>
