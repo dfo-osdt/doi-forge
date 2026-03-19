@@ -193,7 +193,24 @@ Profiles are not stored in the database. They live in the codebase, reviewed via
 - `defaults()` — pre-fills `form_data` with DataCite-shaped JSON when a new DOI is started
 - `required()` — which fields must be present for form validation
 - `hidden()` — which DataCite fields to hide from the form entirely
-- `validators()` — which validators must pass before the DOI can be published (see §4.3)
+- `validators()` — which validator classes must pass before the DOI can be published (see §4.3)
+
+`BaseProfile` declares the contract:
+
+```php
+abstract class BaseProfile
+{
+    abstract public function slug(): string;
+    abstract public function defaults(): array;
+    abstract public function required(): array;
+
+    /** @return array<class-string<ValidatorInterface>> */
+    public function validators(): array { return []; }
+
+    /** @return string[] */
+    public function hidden(): array { return []; }
+}
+```
 
 ```php
 final class CanadianTechReportProfile extends BaseProfile
@@ -265,9 +282,9 @@ Validators are PHP classes in `app/Validators/`. Like profiles, they live in cod
 **Two attachment points:**
 
 - **Profile-level** — a profile declares its own validators via `validators()`. Applies to DOIs started with that profile.
-- **Repository-level** — an admin can configure validators that apply to all DOIs on a repository regardless of profile, covering institutional compliance floors (e.g. a GC Open Government minimum that every repository must meet).
+- **Repository-level** — stored as a JSON array of validator class names in a `validators` column on the `repositories` table. Configured by a global admin in the repository settings UI. Applies to all DOIs on that repository regardless of profile.
 
-Both sets are evaluated together at approval time.
+Both sets are collected and deduplicated by `ValidatorService` before evaluation. A validator class appearing in both the profile and the repository is only run once.
 
 **Two severity levels:**
 
@@ -290,16 +307,60 @@ interface ValidatorInterface
 ```
 
 ```php
+enum ValidationSeverity
+{
+    case Error;
+    case Warning;
+}
+
 final class ValidationResult
 {
     public function __construct(
-        public readonly ValidationSeverity $severity, // Error | Warning
+        public readonly ValidationSeverity $severity,
+        public readonly string $validator, // class name, for activity log
         public readonly string $field,
         public readonly string $message,
     ) {}
 
-    public static function error(string $field, string $message): self { ... }
-    public static function warning(string $field, string $message): self { ... }
+    public static function error(string $class, string $field, string $message): self
+    {
+        return new self(ValidationSeverity::Error, $class, $field, $message);
+    }
+
+    public static function warning(string $class, string $field, string $message): self
+    {
+        return new self(ValidationSeverity::Warning, $class, $field, $message);
+    }
+}
+```
+
+**`ValidatorService`:**
+
+`ValidatorService` is the single call site for running validators. It collects profile-level and repository-level validators, deduplicates, instantiates each via the container, and returns the combined results.
+
+```php
+final class ValidatorService
+{
+    /**
+     * Run all validators for the given DOI and return every result.
+     * Callers inspect severity to decide whether to block or surface warnings.
+     *
+     * @return ValidationResult[]
+     */
+    public function run(Doi $doi): array
+    {
+        $profileClass  = ProfileRegistry::findBySlug($doi->profile_slug);
+        $profileValidators     = $profileClass ? (new $profileClass)->validators() : [];
+        $repositoryValidators  = $doi->repository->validators ?? [];
+
+        $classes = array_unique(array_merge($profileValidators, $repositoryValidators));
+
+        return collect($classes)
+            ->flatMap(fn (string $class) => app($class)->validate(
+                DoiData::from($doi->form_data)
+            ))
+            ->all();
+    }
 }
 ```
 
@@ -318,14 +379,14 @@ final class DataCiteRecommendedFieldsValidator implements ValidatorInterface
         $results = [];
 
         if ($data->descriptions->isEmpty()) {
-            $results[] = ValidationResult::warning('descriptions', 'At least one description is strongly recommended by DataCite.');
+            $results[] = ValidationResult::warning(static::class, 'descriptions', 'At least one description is strongly recommended by DataCite.');
         }
 
         $hasNameIdentifier = $data->creators
             ->some(fn (CreatorData $creator) => $creator->nameIdentifiers->isNotEmpty());
 
         if (!$hasNameIdentifier) {
-            $results[] = ValidationResult::warning('creators', 'At least one creator should have a name identifier (e.g. ORCID).');
+            $results[] = ValidationResult::warning(static::class, 'creators', 'At least one creator should have a name identifier (e.g. ORCID).');
         }
 
         return $results;
@@ -348,7 +409,22 @@ The approval view shows a validator results panel. Errors are listed with a clea
 
 **Activity log:**
 
-Acknowledged warnings are recorded in the activity log at approval time — which warnings were present, and that the approver acknowledged them. This provides an audit trail for deliberate decisions to publish with known metadata gaps.
+Acknowledged warnings are recorded in the activity log at approval time. The `properties` payload includes the full list of acknowledged `ValidationResult` objects — validator class name, field, and message — so the audit trail captures exactly which gaps the approver knowingly accepted:
+
+```php
+activity()
+    ->on($doi)
+    ->withProperties([
+        'acknowledged_warnings' => collect($warnings)
+            ->map(fn (ValidationResult $r) => [
+                'validator' => $r->validator, // class name
+                'field'     => $r->field,
+                'message'   => $r->message,
+            ])
+            ->all(),
+    ])
+    ->log('doi.approved_with_warnings');
+```
 
 ### 4.4 User
 
@@ -1125,13 +1201,27 @@ Schedule::call(function () {
 
 Integrations without a schedule can be triggered manually from the repository admin UI.
 
-## 17. Open Source Considerations
+## 17. Extension Packages
+
+Profiles and validators are registered through two small registries — `ProfileRegistry` and `ValidatorRegistry` — that live in the core application. In `AppServiceProvider::boot()`, each profile and validator class is registered with a single call:
+
+```php
+ProfileRegistry::register(CanadianTechReportProfile::class);
+ValidatorRegistry::register(DataCiteRecommendedFieldsValidator::class);
+```
+
+This keeps the discovery mechanism explicit and trivially type-checked by Larastan. Adding a profile or validator is a one-line change in the service provider, reviewed via PR alongside the class itself.
+
+The registry pattern also provides a clear path to Composer packages if a second institution adopts DOI Forge — a package would simply ship a service provider that makes those same registration calls, auto-discovered by Laravel. That step is deferred until there is real demand for it.
+
+---
+
+## 18. Open Source Considerations
 
 DOI Forge is designed to be adopted by any institution with minimal effort. Principles:
 
 - **Opinionated but configurable** — sensible defaults, institution-specific values in config
-- **No plugin system** — institutions fork, adapt, or contribute PRs
-- **Profiles as code** — departments add profile classes to the `app/Profiles/` directory, reviewed via PR, fully typed and validated by Larastan
+- **Extension packages** — profiles and validators ship as Composer packages, added or removed without touching core application code (see §17)
 - **Standard PHP deployment** — deploys to any Ubuntu VM with Nginx + PHP 8.4-FPM + Redis. Provisioning script included. No containers required
 - **English and French** — fully bilingual out of the box, no rework needed
 
@@ -1139,7 +1229,7 @@ A `CONTRIBUTING.md` and a seed command for example profiles will be provided. A 
 
 ---
 
-## 18. Out of Scope (v1)
+## 19. Out of Scope (v1)
 
 - Full DataCite API pass-through proxy
 - DOI local sync / mirror
@@ -1152,7 +1242,7 @@ A `CONTRIBUTING.md` and a seed command for example profiles will be provided. A 
 
 ---
 
-## 19. Open Questions
+## 20. Open Questions
 
 - Which GC subject vocabulary should be the default for `gccore` — the Government of Canada Core Subject Thesaurus?
 - Should the Horizon dashboard be exposed publicly (admin-gated) or only on an internal network interface?
@@ -1163,7 +1253,7 @@ _Document maintained in the DOI Forge repository under `/docs/design.md`_
 
 ---
 
-## 20. Database Schema
+## 21. Database Schema
 
 ```mermaid
 erDiagram
@@ -1266,7 +1356,7 @@ erDiagram
 
 ---
 
-## 21. Design Decisions & Rationale
+## 22. Design Decisions & Rationale
 
 This section records key decisions made during design, and why, to prevent future contributors from relitigating settled questions.
 
