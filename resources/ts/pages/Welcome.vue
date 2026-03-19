@@ -27,27 +27,27 @@ const { t } = useI18n()
     >
   </Head>
 
-  <div class="relative flex min-h-screen flex-col overflow-hidden bg-[#FDFDFC] text-[#1b1b18] dark:bg-[#0a0a0a] dark:text-[#EDEDEC]">
+  <div class="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
     <!-- Subtle dot-grid background -->
     <div
       class="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.03]"
-      style="background-image: radial-gradient(circle, #1b1b18 1px, transparent 1px); background-size: 28px 28px;"
+      style="background-image: radial-gradient(circle, hsl(var(--foreground)) 1px, transparent 1px); background-size: 28px 28px;"
     />
 
     <!-- Header -->
     <header class="relative z-10 flex items-center justify-between px-6 py-5 lg:px-10">
       <div
-        class="select-none text-[11px] tracking-[0.25em] text-[#c8c8be] uppercase dark:text-[#3a3a32]"
+        class="select-none text-[11px] tracking-[0.25em] text-muted-foreground/30 uppercase"
         style="font-family: 'IBM Plex Mono', monospace;"
         aria-hidden="true"
       >
-        10.XXXX/doi-forge
+        10.XXXX/doi-primary
       </div>
       <nav class="flex items-center gap-2">
         <template v-if="$page.props.auth.user">
           <Link
             :href="dashboard()"
-            class="inline-flex items-center rounded-sm border border-forge/40 px-4 py-1.5 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-forge dark:text-[#EDEDEC]"
+            class="inline-flex items-center rounded-sm border border-primary/40 px-4 py-1.5 text-sm text-foreground transition-colors duration-150 hover:border-primary"
           >
             {{ t('welcome.dashboard') }}
           </Link>
@@ -55,14 +55,14 @@ const { t } = useI18n()
         <template v-else>
           <Link
             :href="login()"
-            class="inline-flex items-center rounded-sm border border-transparent px-4 py-1.5 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-forge/40 dark:text-[#EDEDEC]"
+            class="inline-flex items-center rounded-sm border border-transparent px-4 py-1.5 text-sm text-foreground transition-colors duration-150 hover:border-primary/40"
           >
             {{ t('log-in') }}
           </Link>
           <Link
             v-if="canRegister"
             :href="register()"
-            class="inline-flex items-center rounded-sm border border-forge/40 px-4 py-1.5 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-forge dark:text-[#EDEDEC]"
+            class="inline-flex items-center rounded-sm border border-primary/40 px-4 py-1.5 text-sm text-foreground transition-colors duration-150 hover:border-primary"
           >
             {{ t('register') }}
           </Link>
@@ -76,21 +76,21 @@ const { t } = useI18n()
     <main class="relative z-10 flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
       <!-- Decorative rule -->
       <div class="mb-10 flex items-center gap-5" aria-hidden="true">
-        <div class="h-px w-20 bg-linear-to-r from-transparent via-forge/30 to-forge/50" />
-        <AppLogoIcon class="size-14 text-forge" />
-        <div class="h-px w-20 bg-linear-to-l from-transparent via-forge/30 to-forge/50" />
+        <div class="h-px w-20 bg-linear-to-r from-transparent via-primary/30 to-primary/50" />
+        <AppLogoIcon class="size-14 text-primary" />
+        <div class="h-px w-20 bg-linear-to-l from-transparent via-primary/30 to-primary/50" />
       </div>
 
       <!-- Wordmark -->
       <h1
-        class="mb-6 text-[clamp(4rem,12vw,8rem)] leading-none tracking-tight text-[#1b1b18] dark:text-[#EDEDEC]"
+        class="mb-6 text-[clamp(4rem,12vw,8rem)] leading-none tracking-tight text-foreground"
         style="font-family: 'DM Serif Display', serif;"
       >
         DOI Forge
       </h1>
 
       <!-- Tagline -->
-      <p class="mb-12 max-w-lg text-base leading-relaxed text-[#706f6c] dark:text-[#A1A09A]">
+      <p class="mb-12 max-w-lg text-base leading-relaxed text-muted-foreground">
         {{ t('welcome.tagline') }}
       </p>
 
@@ -98,7 +98,7 @@ const { t } = useI18n()
       <template v-if="$page.props.auth.user">
         <Link
           :href="dashboard()"
-          class="inline-flex items-center rounded-sm border border-forge/40 px-8 py-3 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-forge dark:text-[#EDEDEC]"
+          class="inline-flex items-center rounded-sm border border-primary/40 px-8 py-3 text-sm text-foreground transition-colors duration-150 hover:border-primary"
         >
           {{ t('welcome.dashboard') }}
         </Link>
@@ -106,7 +106,7 @@ const { t } = useI18n()
       <template v-else>
         <Link
           :href="login()"
-          class="inline-flex items-center rounded-sm border border-forge/40 px-8 py-3 text-sm text-[#1b1b18] transition-colors duration-150 hover:border-forge dark:text-[#EDEDEC]"
+          class="inline-flex items-center rounded-sm border border-primary/40 px-8 py-3 text-sm text-foreground transition-colors duration-150 hover:border-primary"
         >
           {{ t('log-in') }}
         </Link>
@@ -116,7 +116,7 @@ const { t } = useI18n()
     <!-- Footer -->
     <footer class="relative z-10 px-6 py-5 text-center lg:px-10">
       <div
-        class="text-[10px] tracking-[0.3em] text-[#706f6c] dark:text-[#5a5a52]"
+        class="text-[10px] tracking-[0.3em] text-muted-foreground"
         style="font-family: 'IBM Plex Mono', monospace;"
       >
         v0.0.0

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3'
+import AppearanceToggle from '@/components/AppearanceToggle.vue'
 import AppLogoIcon from '@/components/AppLogoIcon.vue'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import { home } from '@/routes'
@@ -16,6 +17,7 @@ defineProps<{
   >
     <div class="absolute top-4 right-4">
       <LocaleSwitcher />
+      <AppearanceToggle class="ml-2" />
     </div>
     <div class="w-full max-w-sm">
       <div class="flex flex-col gap-8">
@@ -28,7 +30,7 @@ defineProps<{
               class="mb-1 flex h-9 w-9 items-center justify-center rounded-md"
             >
               <AppLogoIcon
-                class="size-9 fill-current text-[var(--foreground)] dark:text-white"
+                class="size-9 fill-current text-primary"
               />
             </div>
             <span class="sr-only">{{ title }}</span>
