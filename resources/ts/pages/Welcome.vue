@@ -2,6 +2,7 @@
 import { Head, Link } from '@inertiajs/vue3'
 import { useI18n } from 'vue-i18n'
 import AppearanceToggle from '@/components/AppearanceToggle.vue'
+import AppDoiBadge from '@/components/AppDoiBadge.vue'
 import AppLogoIcon from '@/components/AppLogoIcon.vue'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import { dashboard, login, register } from '@/routes'
@@ -22,7 +23,7 @@ const { t } = useI18n()
   <Head title="Welcome">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&display=swap"
       rel="stylesheet"
     >
   </Head>
@@ -36,13 +37,7 @@ const { t } = useI18n()
 
     <!-- Header -->
     <header class="relative z-10 flex items-center justify-between px-6 py-5 lg:px-10">
-      <div
-        class="select-none text-[11px] tracking-[0.25em] text-muted-foreground/30 uppercase"
-        style="font-family: 'IBM Plex Mono', monospace;"
-        aria-hidden="true"
-      >
-        10.XXXX/doi-primary
-      </div>
+      <AppDoiBadge />
       <nav class="flex items-center gap-2">
         <template v-if="$page.props.auth.user">
           <Link
@@ -116,8 +111,7 @@ const { t } = useI18n()
     <!-- Footer -->
     <footer class="relative z-10 px-6 py-5 text-center lg:px-10">
       <div
-        class="text-[10px] tracking-[0.3em] text-muted-foreground"
-        style="font-family: 'IBM Plex Mono', monospace;"
+        class="font-mono text-[10px] tracking-[0.3em] text-muted-foreground"
       >
         v0.0.0
       </div>
