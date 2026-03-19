@@ -254,7 +254,7 @@ The profile only participates at two moments: when a new DOI is created (`defaul
 
 ### 4.3 User
 
-Created automatically on first Entra ID login. No roles are assigned on creation — an admin must explicitly grant repository access. In local/dev mode, Breeze-style authentication is used with the same user model.
+Created automatically on first Entra ID login. No roles are assigned on creation — an admin must explicitly grant repository access and assign a role (observer by default). In local/dev mode, Breeze-style authentication is used with the same user model.
 
 ### 4.4 DOI Record
 
@@ -268,15 +268,14 @@ A DOI record tracks the full lifecycle from initial form composition through pub
 - `doi` — null until DataCite confirms draft creation
 - `state` — `DoiState` enum cast: `composing | draft | pending_approval | published | rejected | withdrawn`
 - `submitted_by` — FK to users (resolved from email for API submissions)
-- `approved_by` — FK to users, nullable, set on approval
-- `approved_at` — timestamp, nullable
-- `approver_notes` — text, nullable, used for both approval comments and rejection reasons
-- `rejected_at` — timestamp, nullable
-- `withdrawn_at` — timestamp, nullable
+- `approved_by` — FK to users, nullable, shown in UI
+- `approved_at` — timestamp, nullable, shown in UI
+- `published_at` — timestamp, nullable, set on first publication (used to detect re-approval vs first approval)
+- `approver_notes` — text, nullable, shown in UI for both approval comments and rejection reasons
 - `url_verified` — boolean, set by background URL verification job
 - `url_verified_at` — timestamp, nullable
 - `url_verification_error` — nullable, populated if verification fails
-- `last_autosaved_at` — timestamp
+- `last_autosaved_at` — timestamp, shown in form UI ("Last saved X ago")
 
 ### 4.5 DOI State Machine & Autosave
 
@@ -284,14 +283,16 @@ DOI Forge maintains its own application state machine that maps onto — but is 
 
 **State mapping:**
 
-| DOI Forge state    | DataCite state | Notes                                                           |
-| ------------------ | -------------- | --------------------------------------------------------------- |
-| `composing`        | none           | Local only, nothing in DataCite                                 |
-| `draft`            | `draft`        | DOI exists, deletable, not indexed                              |
-| `pending_approval` | `draft`        | Still draft in DataCite, awaiting our approval                  |
-| `published`        | `findable`     | We triggered the transition                                     |
-| `rejected`         | `draft`        | Returned to submitter for corrections, resubmittable            |
-| `withdrawn`        | none           | Cancelled — DataCite draft deleted, record soft-deleted locally |
+| DOI Forge state    | DataCite state      | Notes                                                           |
+| ------------------ | ------------------- | --------------------------------------------------------------- |
+| `composing`        | none                | Local only, nothing in DataCite                                 |
+| `draft`            | `draft`             | DOI exists, deletable, not indexed                              |
+| `pending_approval` | `draft` or `findable` | Internal governance state — DataCite state unchanged while awaiting approval |
+| `published`        | `findable`          | We triggered the transition                                     |
+| `rejected`         | `draft` or `findable` | Returned to editor for corrections, resubmittable — DataCite state unchanged |
+| `withdrawn`        | none                | Cancelled — DataCite draft deleted, record soft-deleted locally |
+
+`pending_approval` is purely internal. When a new DOI is submitted for first publication, DataCite remains `draft`. When a published DOI is edited and resubmitted, DataCite remains `findable` with the previous metadata — DOI Forge holds the pending changes in `form_data` and only pushes to DataCite on approval. The approval handler always issues a metadata update; for first publication this includes the `event: "publish"` flag to transition DataCite from `draft` to `findable`.
 
 The `DoiState` PHP enum makes this explicit:
 
@@ -313,14 +314,15 @@ enum DoiState: string
         };
     }
 
-    public function dataciteState(): ?string
+    /** Whether the DOI has ever been published (findable) in DataCite. */
+    public function isReapproval(Doi $doi): bool
     {
-        return match($this) {
-            self::Composing, self::Withdrawn             => null,
-            self::Draft, self::PendingApproval,
-            self::Rejected                               => 'draft',
-            self::Published                              => 'findable',
-        };
+        return $doi->published_at !== null;
+    }
+
+    public function isEditable(): bool
+    {
+        return in_array($this, [self::Composing, self::Draft, self::Rejected]);
     }
 }
 ```
@@ -349,26 +351,34 @@ enum DoiState: string
               |                |                       |
               v                v                       |
       pending_approval    url_invalid                  |
-      (form locked,      (notifies submitter           |
+      (form locked,      (notifies editor              |
        approver inbox)    to fix URL)                  |
            /    \                                      |
      [Approve] [Reject] ──────────────────────────────┘
          |
          v
-     published
-  (DataCite: findable)
+     published  ──── [Edit published DOI] ───┐
+  (DataCite: findable)                       |
+       ↑                                     v
+       |                              pending_approval
+       |                              (DataCite stays findable,
+       |                               form_data holds changes)
+       |                                   /    \
+       └──────────── [Approve]            [Reject] → editor fixes
+                  (update metadata                     and resubmits
+                   in DataCite)
 ```
 
 **States:**
 
 - `composing` — local only, nothing in DataCite, autosaved via debounced PATCH
 - `draft` — DOI exists in DataCite (deletable, not indexed), form still editable and autosaved
-- `pending_approval` — awaiting human review, form locked
-- `published` — DOI is findable in DataCite, permanent, cannot be deleted
-- `rejected` — returned to submitter with notes, expected to be corrected and resubmitted
-- `withdrawn` — deliberately cancelled by submitter or admin. DataCite draft deleted if it existed. Record soft-deleted locally but retained for audit. Distinct from `rejected` — a withdrawn DOI is not expected to be resubmitted
+- `pending_approval` — awaiting human review, form locked. DataCite state is unchanged (remains `draft` for new DOIs, `findable` for published DOIs being edited)
+- `published` — DOI is findable in DataCite, permanent, cannot be deleted. Can be edited, which triggers re-approval
+- `rejected` — returned to editor with notes, expected to be corrected and resubmitted. DataCite state unchanged
+- `withdrawn` — deliberately cancelled by editor or admin. DataCite draft deleted if it existed. Record soft-deleted locally but retained for audit. Distinct from `rejected` — a withdrawn DOI is not expected to be resubmitted
 
-**URL verification** runs as a queued job when a DOI is submitted for approval. If the target URL returns a non-2xx response the state transitions to `url_invalid` and the submitter is notified. Because some institutional URLs sit behind auth or VPN, an approver can override the URL check and approve regardless — the verification result is advisory, not a hard block.
+**URL verification** runs as a queued job when a DOI is submitted for approval. If the target URL returns a non-2xx response the state transitions to `url_invalid` and the editor is notified. Because some institutional URLs sit behind auth or VPN, an approver can override the URL check and approve regardless — the verification result is advisory, not a hard block.
 
 **Autosave:** The Vue form debounces a PATCH to `dois/{id}/autosave` two seconds after the last change. No validation runs on autosave — only on explicit "Create Draft" or "Submit for Approval" actions. The form can be closed and resumed at any point.
 
@@ -394,14 +404,14 @@ Built on Spatie Laravel Permission with the Teams feature enabled. Teams map dir
 
 ### 5.1 Roles
 
-| Role               | Scope          | Capabilities                                                                   |
-| ------------------ | -------------- | ------------------------------------------------------------------------------ |
-| `admin`            | Global         | Manage repositories, profiles, users, issue API tokens                         |
-| `repository_admin` | Per repository | Manage profiles, grant/revoke access on their repository                       |
-| `approver`         | Per repository | Review and approve/reject DOIs (`can_approve` permission, enforced via Policy) |
-| `submitter`        | Per repository | Create and submit DOIs for approval                                            |
+| Role       | Scope          | Capabilities                                                                   |
+| ---------- | -------------- | ------------------------------------------------------------------------------ |
+| `admin`    | Global         | Manage repositories, assign roles, issue API tokens, full backend access       |
+| `approver` | Per repository | Review and approve/reject DOIs, plus all editor capabilities                   |
+| `editor`   | Per repository | Create, edit, and submit DOIs for approval                                     |
+| `observer` | Per repository | View DOIs and activity on the repository (default role on assignment)          |
 
-A user can hold different roles on different repositories (e.g. approver on publications, submitter on data).
+A user can hold different roles on different repositories (e.g. approver on publications, editor on data). Roles are cumulative — an approver inherits all editor capabilities. Observers are the starting point when a user is granted access to a repository; an admin upgrades them to editor or approver as needed.
 
 ### 5.2 Permission Events (Activity Log)
 
@@ -542,9 +552,9 @@ Email notifications via Laravel Mail / queued jobs:
 | Trigger                                        | Recipients                      |
 | ---------------------------------------------- | ------------------------------- |
 | Submission sent for approval                   | All approvers on the repository |
-| Submission approved                            | Submitter                       |
-| Submission rejected (with notes)               | Submitter                       |
-| DataCite API failure (after retries exhausted) | Repository admin                |
+| Submission approved                            | Editor who submitted            |
+| Submission rejected (with notes)               | Editor who submitted            |
+| DataCite API failure (after retries exhausted) | Admin                           |
 
 ---
 
@@ -1032,7 +1042,6 @@ A `CONTRIBUTING.md` and a seed command for example profiles will be provided. A 
 
 ## 19. Open Questions
 
-- Should rejected submissions be editable and resubmittable, or closed and a new submission created? (Current assumption: editable and resubmittable)
 - Which GC subject vocabulary should be the default for `gccore` — the Government of Canada Core Subject Thesaurus?
 - Should the Horizon dashboard be exposed publicly (admin-gated) or only on an internal network interface?
 
@@ -1073,10 +1082,10 @@ erDiagram
     string state
     json form_data
     timestamp approved_at
+    timestamp published_at
     text approver_notes
-    timestamp rejected_at
-    timestamp withdrawn_at
     bool url_verified
+    timestamp url_verified_at
     string url_verification_error
     timestamp last_autosaved_at
     timestamp deleted_at
