@@ -5,6 +5,7 @@ namespace App\Data\Doi;
 use App\Enums\DataCite\DateType;
 use Spatie\LaravelData\Attributes\Validation\Required;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Optional;
 
 class DateData extends Data
 {
@@ -13,6 +14,6 @@ class DateData extends Data
         public string|int $date,
         #[Required]
         public DateType $dateType,
-        public ?string $dateInformation = null,
+        public string|Optional $dateInformation = new Optional,
     ) {}
 }

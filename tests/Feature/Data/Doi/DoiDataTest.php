@@ -8,6 +8,7 @@ use App\Data\Doi\TitleData;
 use App\Enums\DataCite\NameType;
 use App\Enums\DataCite\ResourceTypeGeneral;
 use App\Enums\DataCite\TitleType;
+use Spatie\LaravelData\Optional;
 
 function minimalDoiData(): DoiData
 {
@@ -63,27 +64,31 @@ it('serializes to array preserving enum values as strings', function () {
         ->and($array['types']['resourceTypeGeneral'])->toBe('Dataset');
 });
 
-it('optional fields default to null', function () {
+it('optional fields default correctly when not provided', function () {
     $data = minimalDoiData();
 
-    expect($data->prefix)->toBeNull()
-        ->and($data->identifiers)->toBeNull()
-        ->and($data->alternateIdentifiers)->toBeNull()
-        ->and($data->subjects)->toBeNull()
-        ->and($data->contributors)->toBeNull()
-        ->and($data->dates)->toBeNull()
-        ->and($data->language)->toBeNull()
-        ->and($data->relatedIdentifiers)->toBeNull()
-        ->and($data->relatedItems)->toBeNull()
-        ->and($data->sizes)->toBeNull()
-        ->and($data->formats)->toBeNull()
-        ->and($data->version)->toBeNull()
-        ->and($data->rightsList)->toBeNull()
-        ->and($data->descriptions)->toBeNull()
-        ->and($data->geoLocations)->toBeNull()
-        ->and($data->fundingReferences)->toBeNull()
-        ->and($data->contentUrl)->toBeNull()
-        ->and($data->schemaVersion)->toBeNull();
+    // String/object optional fields use Optional sentinel
+    expect($data->prefix)->toBeInstanceOf(Optional::class)
+        ->and($data->language)->toBeInstanceOf(Optional::class)
+        ->and($data->version)->toBeInstanceOf(Optional::class)
+        ->and($data->contentUrl)->toBeInstanceOf(Optional::class)
+        ->and($data->schemaVersion)->toBeInstanceOf(Optional::class)
+        ->and($data->container)->toBeInstanceOf(Optional::class);
+
+    // Array optional fields default to empty arrays
+    expect($data->identifiers)->toBe([])
+        ->and($data->alternateIdentifiers)->toBe([])
+        ->and($data->subjects)->toBe([])
+        ->and($data->contributors)->toBe([])
+        ->and($data->dates)->toBe([])
+        ->and($data->relatedIdentifiers)->toBe([])
+        ->and($data->relatedItems)->toBe([])
+        ->and($data->sizes)->toBe([])
+        ->and($data->formats)->toBe([])
+        ->and($data->rightsList)->toBe([])
+        ->and($data->descriptions)->toBe([])
+        ->and($data->geoLocations)->toBe([])
+        ->and($data->fundingReferences)->toBe([]);
 });
 
 it('accepts publisher as string', function () {

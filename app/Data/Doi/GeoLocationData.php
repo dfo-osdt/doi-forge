@@ -5,18 +5,19 @@ namespace App\Data\Doi;
 use Spatie\LaravelData\Attributes\DataCollectionOf;
 use Spatie\LaravelData\Attributes\Validation\Max;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Optional;
 
 class GeoLocationData extends Data
 {
     /**
-     * @param  GeoLocationPolygonData[]|null  $geoLocationPolygon
+     * @param  GeoLocationPolygonData[]  $geoLocationPolygon
      */
     public function __construct(
         #[Max(255)]
-        public ?string $geoLocationPlace = null,
-        public ?GeoLocationPointData $geoLocationPoint = null,
-        public ?GeoLocationBoxData $geoLocationBox = null,
+        public string|Optional $geoLocationPlace = new Optional,
+        public GeoLocationPointData|Optional $geoLocationPoint = new Optional,
+        public GeoLocationBoxData|Optional $geoLocationBox = new Optional,
         #[DataCollectionOf(GeoLocationPolygonData::class)]
-        public ?array $geoLocationPolygon = null,
+        public array|Optional $geoLocationPolygon = new Optional,
     ) {}
 }

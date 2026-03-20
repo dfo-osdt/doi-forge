@@ -9,6 +9,7 @@ use Spatie\LaravelData\Attributes\Validation\Min;
 use Spatie\LaravelData\Attributes\Validation\Required;
 use Spatie\LaravelData\Attributes\Validation\Url;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Optional;
 use VincentAuger\DataCiteSdk\Data\Affiliations\PublisherData as SdkPublisherData;
 use VincentAuger\DataCiteSdk\Data\CreateDOIInput;
 use VincentAuger\DataCiteSdk\Data\DOIData as SdkDOIData;
@@ -34,19 +35,19 @@ class DoiData extends Data
     /**
      * @param  CreatorData[]  $creators
      * @param  TitleData[]  $titles
-     * @param  IdentifierData[]|null  $identifiers
-     * @param  AlternateIdentifierData[]|null  $alternateIdentifiers
-     * @param  SubjectData[]|null  $subjects
-     * @param  ContributorData[]|null  $contributors
-     * @param  DateData[]|null  $dates
-     * @param  RelatedIdentifierData[]|null  $relatedIdentifiers
-     * @param  RelatedItemData[]|null  $relatedItems
-     * @param  string[]|null  $sizes
-     * @param  string[]|null  $formats
-     * @param  RightsListData[]|null  $rightsList
-     * @param  DescriptionData[]|null  $descriptions
-     * @param  GeoLocationData[]|null  $geoLocations
-     * @param  FundingReferenceData[]|null  $fundingReferences
+     * @param  IdentifierData[]  $identifiers
+     * @param  AlternateIdentifierData[]  $alternateIdentifiers
+     * @param  SubjectData[]  $subjects
+     * @param  ContributorData[]  $contributors
+     * @param  DateData[]  $dates
+     * @param  RelatedIdentifierData[]  $relatedIdentifiers
+     * @param  RelatedItemData[]  $relatedItems
+     * @param  string[]  $sizes
+     * @param  string[]  $formats
+     * @param  RightsListData[]  $rightsList
+     * @param  DescriptionData[]  $descriptions
+     * @param  GeoLocationData[]  $geoLocations
+     * @param  FundingReferenceData[]  $fundingReferences
      */
     public function __construct(
         #[Required, DataCollectionOf(CreatorData::class), Min(1)]
@@ -62,40 +63,40 @@ class DoiData extends Data
         #[Required, Url, Max(2048)]
         public string $url,
         #[Max(255)]
-        public ?string $prefix = null,
+        public string|Optional $prefix = new Optional,
         #[DataCollectionOf(IdentifierData::class)]
-        public ?array $identifiers = null,
+        public array $identifiers = [],
         #[DataCollectionOf(AlternateIdentifierData::class)]
-        public ?array $alternateIdentifiers = null,
-        public ?ContainerData $container = null,
+        public array $alternateIdentifiers = [],
+        public ContainerData|Optional $container = new Optional,
         #[DataCollectionOf(SubjectData::class)]
-        public ?array $subjects = null,
+        public array $subjects = [],
         #[DataCollectionOf(ContributorData::class)]
-        public ?array $contributors = null,
+        public array $contributors = [],
         #[DataCollectionOf(DateData::class)]
-        public ?array $dates = null,
+        public array $dates = [],
         #[Max(10)]
-        public ?string $language = null,
+        public string|Optional $language = new Optional,
         #[DataCollectionOf(RelatedIdentifierData::class)]
-        public ?array $relatedIdentifiers = null,
+        public array $relatedIdentifiers = [],
         #[DataCollectionOf(RelatedItemData::class)]
-        public ?array $relatedItems = null,
-        public ?array $sizes = null,
-        public ?array $formats = null,
+        public array $relatedItems = [],
+        public array $sizes = [],
+        public array $formats = [],
         #[Max(255)]
-        public ?string $version = null,
+        public string|Optional $version = new Optional,
         #[DataCollectionOf(RightsListData::class)]
-        public ?array $rightsList = null,
+        public array $rightsList = [],
         #[DataCollectionOf(DescriptionData::class)]
-        public ?array $descriptions = null,
+        public array $descriptions = [],
         #[DataCollectionOf(GeoLocationData::class)]
-        public ?array $geoLocations = null,
+        public array $geoLocations = [],
         #[DataCollectionOf(FundingReferenceData::class)]
-        public ?array $fundingReferences = null,
+        public array $fundingReferences = [],
         #[Url, Max(2048)]
-        public ?string $contentUrl = null,
+        public string|Optional $contentUrl = new Optional,
         #[Max(255)]
-        public ?string $schemaVersion = null,
+        public string|Optional $schemaVersion = new Optional,
     ) {}
 
     public static function fromSdk(SdkDOIData $doi): static
@@ -109,30 +110,30 @@ class DoiData extends Data
 
         return new CreateDOIInput(
             prefix: (string) ($attrs['prefix'] ?? ''),
-            creators: self::buildCreators($attrs['creators']),
+            creators: array_values(array_filter(array_map(Creator::fromArray(...), $attrs['creators']))),
             titles: array_map(Title::fromArray(...), $attrs['titles']),
             publicationYear: (int) $attrs['publicationYear'],
             publisher: is_array($attrs['publisher']) ? SdkPublisherData::fromArray($attrs['publisher']) : (string) $attrs['publisher'],
             types: ResourceType::fromArray($attrs['types']),
             url: (string) $attrs['url'],
-            identifiers: $attrs['identifiers'] !== null ? array_map(Identifier::fromArray(...), $attrs['identifiers']) : null,
-            alternateIdentifiers: $attrs['alternateIdentifiers'] !== null ? array_map(AlternateIdentifier::fromArray(...), $attrs['alternateIdentifiers']) : null,
-            container: $attrs['container'] !== null ? SdkContainerData::fromArray($attrs['container']) : null,
-            subjects: $attrs['subjects'] !== null ? array_map(Subject::fromArray(...), $attrs['subjects']) : null,
-            contributors: $attrs['contributors'] !== null ? self::buildContributors($attrs['contributors']) : null,
-            dates: $attrs['dates'] !== null ? array_map(Date::fromArray(...), $attrs['dates']) : null,
-            language: $attrs['language'],
-            relatedIdentifiers: $attrs['relatedIdentifiers'] !== null ? array_map(RelatedIdentifier::fromArray(...), $attrs['relatedIdentifiers']) : null,
-            relatedItems: $attrs['relatedItems'] !== null ? array_map(RelatedItem::fromArray(...), $attrs['relatedItems']) : null,
+            identifiers: array_map(Identifier::fromArray(...), $attrs['identifiers']),
+            alternateIdentifiers: array_map(AlternateIdentifier::fromArray(...), $attrs['alternateIdentifiers']),
+            container: isset($attrs['container']) ? SdkContainerData::fromArray($attrs['container']) : null,
+            subjects: array_map(Subject::fromArray(...), $attrs['subjects']),
+            contributors: array_values(array_filter(array_map(Contributor::fromArray(...), $attrs['contributors']))),
+            dates: array_map(Date::fromArray(...), $attrs['dates']),
+            language: $attrs['language'] ?? null,
+            relatedIdentifiers: array_map(RelatedIdentifier::fromArray(...), $attrs['relatedIdentifiers']),
+            relatedItems: array_map(RelatedItem::fromArray(...), $attrs['relatedItems']),
             sizes: $attrs['sizes'],
             formats: $attrs['formats'],
-            version: $attrs['version'],
-            rightsList: $attrs['rightsList'] !== null ? array_map(RightsList::fromArray(...), $attrs['rightsList']) : null,
-            descriptions: $attrs['descriptions'] !== null ? array_values(array_filter(array_map(Description::fromArray(...), $attrs['descriptions']))) : null,
-            geoLocations: $attrs['geoLocations'] !== null ? array_map(GeoLocation::fromArray(...), $attrs['geoLocations']) : null,
-            fundingReferences: $attrs['fundingReferences'] !== null ? array_map(FundingReference::fromArray(...), $attrs['fundingReferences']) : null,
-            contentUrl: $attrs['contentUrl'],
-            schemaVersion: $attrs['schemaVersion'],
+            version: $attrs['version'] ?? null,
+            rightsList: array_map(RightsList::fromArray(...), $attrs['rightsList']),
+            descriptions: array_values(array_filter(array_map(Description::fromArray(...), $attrs['descriptions']))),
+            geoLocations: array_map(GeoLocation::fromArray(...), $attrs['geoLocations']),
+            fundingReferences: array_map(FundingReference::fromArray(...), $attrs['fundingReferences']),
+            contentUrl: $attrs['contentUrl'] ?? null,
+            schemaVersion: $attrs['schemaVersion'] ?? null,
         );
     }
 
@@ -141,49 +142,31 @@ class DoiData extends Data
         $attrs = $this->toArray();
 
         return new UpdateDOIInput(
-            prefix: $attrs['prefix'],
-            creators: self::buildCreators($attrs['creators']),
+            prefix: $attrs['prefix'] ?? null,
+            creators: array_values(array_filter(array_map(Creator::fromArray(...), $attrs['creators']))),
             titles: array_map(Title::fromArray(...), $attrs['titles']),
-            publicationYear: $attrs['publicationYear'] !== null ? (int) $attrs['publicationYear'] : null,
+            publicationYear: (int) $attrs['publicationYear'],
             publisher: is_array($attrs['publisher']) ? SdkPublisherData::fromArray($attrs['publisher']) : (string) $attrs['publisher'],
-            types: $attrs['types'] !== null ? ResourceType::fromArray($attrs['types']) : null,
+            types: ResourceType::fromArray($attrs['types']),
             url: $attrs['url'],
-            identifiers: $attrs['identifiers'] !== null ? array_map(Identifier::fromArray(...), $attrs['identifiers']) : null,
-            alternateIdentifiers: $attrs['alternateIdentifiers'] !== null ? array_map(AlternateIdentifier::fromArray(...), $attrs['alternateIdentifiers']) : null,
-            container: $attrs['container'] !== null ? SdkContainerData::fromArray($attrs['container']) : null,
-            subjects: $attrs['subjects'] !== null ? array_map(Subject::fromArray(...), $attrs['subjects']) : null,
-            contributors: $attrs['contributors'] !== null ? self::buildContributors($attrs['contributors']) : null,
-            dates: $attrs['dates'] !== null ? array_map(Date::fromArray(...), $attrs['dates']) : null,
-            language: $attrs['language'],
-            relatedIdentifiers: $attrs['relatedIdentifiers'] !== null ? array_map(RelatedIdentifier::fromArray(...), $attrs['relatedIdentifiers']) : null,
-            relatedItems: $attrs['relatedItems'] !== null ? array_map(RelatedItem::fromArray(...), $attrs['relatedItems']) : null,
+            identifiers: array_map(Identifier::fromArray(...), $attrs['identifiers']),
+            alternateIdentifiers: array_map(AlternateIdentifier::fromArray(...), $attrs['alternateIdentifiers']),
+            container: isset($attrs['container']) ? SdkContainerData::fromArray($attrs['container']) : null,
+            subjects: array_map(Subject::fromArray(...), $attrs['subjects']),
+            contributors: array_values(array_filter(array_map(Contributor::fromArray(...), $attrs['contributors']))),
+            dates: array_map(Date::fromArray(...), $attrs['dates']),
+            language: $attrs['language'] ?? null,
+            relatedIdentifiers: array_map(RelatedIdentifier::fromArray(...), $attrs['relatedIdentifiers']),
+            relatedItems: array_map(RelatedItem::fromArray(...), $attrs['relatedItems']),
             sizes: $attrs['sizes'],
             formats: $attrs['formats'],
-            version: $attrs['version'],
-            rightsList: $attrs['rightsList'] !== null ? array_map(RightsList::fromArray(...), $attrs['rightsList']) : null,
-            descriptions: $attrs['descriptions'] !== null ? array_values(array_filter(array_map(Description::fromArray(...), $attrs['descriptions']))) : null,
-            geoLocations: $attrs['geoLocations'] !== null ? array_map(GeoLocation::fromArray(...), $attrs['geoLocations']) : null,
-            fundingReferences: $attrs['fundingReferences'] !== null ? array_map(FundingReference::fromArray(...), $attrs['fundingReferences']) : null,
-            contentUrl: $attrs['contentUrl'],
-            schemaVersion: $attrs['schemaVersion'],
+            version: $attrs['version'] ?? null,
+            rightsList: array_map(RightsList::fromArray(...), $attrs['rightsList']),
+            descriptions: array_values(array_filter(array_map(Description::fromArray(...), $attrs['descriptions']))),
+            geoLocations: array_map(GeoLocation::fromArray(...), $attrs['geoLocations']),
+            fundingReferences: array_map(FundingReference::fromArray(...), $attrs['fundingReferences']),
+            contentUrl: $attrs['contentUrl'] ?? null,
+            schemaVersion: $attrs['schemaVersion'] ?? null,
         );
-    }
-
-    /** @param array<array<string, mixed>> $creators */
-    private static function buildCreators(array $creators): array
-    {
-        return array_values(array_filter(array_map(
-            fn (array $c) => Creator::fromArray([...$c, 'affiliation' => $c['affiliation'] ?? [], 'nameIdentifiers' => $c['nameIdentifiers'] ?? []]),
-            $creators
-        )));
-    }
-
-    /** @param array<array<string, mixed>> $contributors */
-    private static function buildContributors(array $contributors): array
-    {
-        return array_values(array_filter(array_map(
-            fn (array $c) => Contributor::fromArray([...$c, 'affiliation' => $c['affiliation'] ?? [], 'nameIdentifiers' => $c['nameIdentifiers'] ?? []]),
-            $contributors
-        )));
     }
 }

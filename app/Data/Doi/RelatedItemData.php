@@ -9,13 +9,14 @@ use Spatie\LaravelData\Attributes\Validation\Max;
 use Spatie\LaravelData\Attributes\Validation\Min;
 use Spatie\LaravelData\Attributes\Validation\Required;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Optional;
 
 class RelatedItemData extends Data
 {
     /**
      * @param  TitleData[]  $titles
-     * @param  CreatorData[]|null  $creators
-     * @param  ContributorData[]|null  $contributors
+     * @param  CreatorData[]  $creators
+     * @param  ContributorData[]  $contributors
      */
     public function __construct(
         #[DataCollectionOf(TitleData::class), Required, Min(1)]
@@ -24,28 +25,28 @@ class RelatedItemData extends Data
         public RelationType $relationType,
         #[Required]
         public ResourceTypeGeneral $relatedItemType,
-        public ?RelatedItemIdentifierData $relatedItemIdentifier = null,
+        public RelatedItemIdentifierData|Optional $relatedItemIdentifier = new Optional,
         #[DataCollectionOf(CreatorData::class)]
-        public ?array $creators = null,
+        public array $creators = [],
         #[DataCollectionOf(ContributorData::class)]
-        public ?array $contributors = null,
+        public array $contributors = [],
         #[Max(50)]
-        public ?string $publicationYear = null,
+        public string|Optional $publicationYear = new Optional,
         #[Max(255)]
-        public ?string $volume = null,
+        public string|Optional $volume = new Optional,
         #[Max(50)]
-        public ?string $issue = null,
+        public string|Optional $issue = new Optional,
         #[Max(50)]
-        public ?string $number = null,
+        public string|Optional $number = new Optional,
         #[Max(50)]
-        public ?string $numberType = null,
+        public string|Optional $numberType = new Optional,
         #[Max(50)]
-        public ?string $firstPage = null,
+        public string|Optional $firstPage = new Optional,
         #[Max(50)]
-        public ?string $lastPage = null,
+        public string|Optional $lastPage = new Optional,
         #[Max(255)]
-        public ?string $publisher = null,
+        public string|Optional $publisher = new Optional,
         #[Max(255)]
-        public ?string $edition = null,
+        public string|Optional $edition = new Optional,
     ) {}
 }

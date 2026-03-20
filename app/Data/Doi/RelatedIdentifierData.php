@@ -7,6 +7,7 @@ use App\Enums\DataCite\RelationType;
 use Spatie\LaravelData\Attributes\Validation\Required;
 use Spatie\LaravelData\Attributes\Validation\Url;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Optional;
 
 class RelatedIdentifierData extends Data
 {
@@ -17,10 +18,10 @@ class RelatedIdentifierData extends Data
         public RelatedIdentifierType $relatedIdentifierType,
         #[Required]
         public RelationType $relationType,
-        public ?string $relatedMetadataScheme = null,
+        public string|Optional $relatedMetadataScheme = new Optional,
         #[Url]
-        public ?string $schemeUri = null,
-        public ?string $schemeType = null,
-        public ?string $resourceTypeGeneral = null,
+        public string|Optional $schemeUri = new Optional,
+        public string|Optional $schemeType = new Optional,
+        public string|Optional $resourceTypeGeneral = new Optional,
     ) {}
 }

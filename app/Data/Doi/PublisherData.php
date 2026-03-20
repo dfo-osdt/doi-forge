@@ -6,6 +6,7 @@ use Spatie\LaravelData\Attributes\Validation\Max;
 use Spatie\LaravelData\Attributes\Validation\Required;
 use Spatie\LaravelData\Attributes\Validation\Url;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Optional;
 
 class PublisherData extends Data
 {
@@ -13,8 +14,8 @@ class PublisherData extends Data
         #[Required, Max(255)]
         public string $name,
         #[Url]
-        public ?string $schemeUri = null,
-        public ?string $publisherIdentifier = null,
-        public ?string $publisherIdentifierScheme = null,
+        public string|Optional $schemeUri = new Optional,
+        public string|Optional $publisherIdentifier = new Optional,
+        public string|Optional $publisherIdentifierScheme = new Optional,
     ) {}
 }

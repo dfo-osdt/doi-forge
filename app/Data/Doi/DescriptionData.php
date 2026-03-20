@@ -6,6 +6,7 @@ use App\Enums\DataCite\DescriptionType;
 use Spatie\LaravelData\Attributes\Validation\Max;
 use Spatie\LaravelData\Attributes\Validation\Required;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Optional;
 
 class DescriptionData extends Data
 {
@@ -15,6 +16,6 @@ class DescriptionData extends Data
         #[Required]
         public DescriptionType $descriptionType,
         #[Max(10)]
-        public ?string $lang = null,
+        public string|Optional $lang = new Optional,
     ) {}
 }

@@ -6,6 +6,7 @@ use Spatie\LaravelData\Attributes\DataCollectionOf;
 use Spatie\LaravelData\Attributes\Validation\Min;
 use Spatie\LaravelData\Attributes\Validation\Required;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Optional;
 
 class GeoLocationPolygonData extends Data
 {
@@ -15,6 +16,6 @@ class GeoLocationPolygonData extends Data
     public function __construct(
         #[DataCollectionOf(GeoLocationPointData::class), Required, Min(4)]
         public array $polygonPoints,
-        public ?GeoLocationPointData $inPolygonPoint = null,
+        public GeoLocationPointData|Optional $inPolygonPoint = new Optional,
     ) {}
 }

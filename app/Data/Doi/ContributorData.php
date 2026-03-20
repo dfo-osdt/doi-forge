@@ -8,26 +8,27 @@ use Spatie\LaravelData\Attributes\DataCollectionOf;
 use Spatie\LaravelData\Attributes\Validation\Max;
 use Spatie\LaravelData\Attributes\Validation\Required;
 use Spatie\LaravelData\Data;
+use Spatie\LaravelData\Optional;
 
 class ContributorData extends Data
 {
     /**
-     * @param  AffiliationData[]|null  $affiliation
-     * @param  NameIdentifierData[]|null  $nameIdentifiers
+     * @param  AffiliationData[]  $affiliation
+     * @param  NameIdentifierData[]  $nameIdentifiers
      */
     public function __construct(
         #[Required, Max(255)]
         public string $name,
         #[Required]
         public ContributorType $contributorType,
-        public ?NameType $nameType = null,
+        public NameType|Optional $nameType = new Optional,
         #[Max(255)]
-        public ?string $givenName = null,
+        public string|Optional $givenName = new Optional,
         #[Max(255)]
-        public ?string $familyName = null,
+        public string|Optional $familyName = new Optional,
         #[DataCollectionOf(AffiliationData::class)]
-        public ?array $affiliation = null,
+        public array $affiliation = [],
         #[DataCollectionOf(NameIdentifierData::class)]
-        public ?array $nameIdentifiers = null,
+        public array $nameIdentifiers = [],
     ) {}
 }
