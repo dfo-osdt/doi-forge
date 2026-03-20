@@ -23,7 +23,7 @@ function doiFixture(): array
 
 function makeService(): DataCiteService
 {
-    return (new DataCiteService)->for('test-repo-id', 'test-password');
+    return (new DataCiteService)->for('test-repo-id', 'test-password', '10.5281');
 }
 
 function minimalInput(): DoiData
@@ -35,7 +35,6 @@ function minimalInput(): DoiData
         publisher: new PublisherData(name: 'Zenodo'),
         types: new ResourceTypeData(resourceTypeGeneral: ResourceTypeGeneral::Dataset),
         url: 'https://example.com/dataset',
-        prefix: '10.5281',
     );
 }
 

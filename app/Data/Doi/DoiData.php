@@ -29,6 +29,7 @@ use VincentAuger\DataCiteSdk\Data\Metadata\RightsList;
 use VincentAuger\DataCiteSdk\Data\Metadata\Subject;
 use VincentAuger\DataCiteSdk\Data\Metadata\Title;
 use VincentAuger\DataCiteSdk\Data\UpdateDOIInput;
+use VincentAuger\DataCiteSdk\Enums\DOIEvent;
 
 class DoiData extends Data
 {
@@ -104,12 +105,13 @@ class DoiData extends Data
         return static::from($doi->toArray()['data']['attributes']);
     }
 
-    public function toCreateInput(): CreateDOIInput
+    public function toCreateInput(string $prefix, ?DOIEvent $event = null): CreateDOIInput
     {
         $attrs = $this->toArray();
 
         return new CreateDOIInput(
-            prefix: (string) ($attrs['prefix'] ?? ''),
+            prefix: $prefix,
+            event: $event,
             creators: array_values(array_filter(array_map(Creator::fromArray(...), $attrs['creators']))),
             titles: array_map(Title::fromArray(...), $attrs['titles']),
             publicationYear: (int) $attrs['publicationYear'],
@@ -137,12 +139,13 @@ class DoiData extends Data
         );
     }
 
-    public function toUpdateInput(): UpdateDOIInput
+    public function toUpdateInput(?DOIEvent $event = null): UpdateDOIInput
     {
         $attrs = $this->toArray();
 
         return new UpdateDOIInput(
             prefix: $attrs['prefix'] ?? null,
+            event: $event,
             creators: array_values(array_filter(array_map(Creator::fromArray(...), $attrs['creators']))),
             titles: array_map(Title::fromArray(...), $attrs['titles']),
             publicationYear: (int) $attrs['publicationYear'],
