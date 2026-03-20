@@ -148,7 +148,7 @@ DOI Forge deliberately stores only what is needed for governance. It does not mi
 | Table                                   | Purpose                                                                                                     |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `repositories`                          | DataCite repository config, encrypted credentials, validator assignment                                     |
-| `profiles`                              | Metadata profiles — seed data (DoiData DTO), per repository (soft-deleted)                                  |
+| `profiles`                              | Metadata profiles — seed data (DoiData DTO), per repository (soft-deleted). No FK from DOIs — profile usage is recorded in the activity log at creation time |
 | `doi_reviews`                           | Review history — decisions, notes, validator snapshots, acknowledged warnings                                |
 | `validators`                            | Seeded registry of available metadata standard validators (stable IDs, slugs, class references)             |
 | `dois`                                  | Full DOI lifecycle from composing through publication — DataCite-shaped `form_data` autosaved incrementally |
@@ -245,14 +245,19 @@ The seed data also implicitly controls which form sections are shown — section
 ```php
 $doi = Doi::create([
     'repository_id' => $profile->repository_id,
-    'profile_id'    => $profile->id,
     'form_data'     => $profile->data,
     'state'         => DoiState::Composing,
     'submitted_by'  => $user->id,
 ]);
+
+// The activity log records which profile was used at creation time
+activity()
+    ->on($doi)
+    ->withProperties(['profile_id' => $profile->id, 'profile_name' => $profile->name_en])
+    ->log('doi.created');
 ```
 
-The profile participates at one moment: when a new DOI is created (`data` seeds the form). After that it is otherwise irrelevant — the user's `form_data` is the truth. Metadata quality enforcement is handled by the repository's assigned validator (see §4.3).
+The profile participates at one moment: when a new DOI is created (`data` seeds the form). After that it is irrelevant — the user's `form_data` is the truth. The DOI does not store a reference to the profile; the activity log captures which profile was used at creation time for audit purposes. Metadata quality enforcement is handled by the repository's assigned validator (see §4.3).
 
 ### 4.3 Validators
 
@@ -470,7 +475,6 @@ A DOI record tracks the full lifecycle from initial form composition through pub
 **Key fields:**
 
 - `repository_id`
-- `profile_id` — FK to profiles, which profile initialised this form
 - `form_data` — JSON, full DataCite-shaped metadata, autosaved incrementally
 - `doi` — null until DataCite confirms draft creation
 - `state` — `DoiState` enum cast: `composing | draft | pending_approval | published | rejected | withdrawn`
@@ -1176,31 +1180,73 @@ GitHub Actions with a self-hosted runner on the same on-prem VM. Pipeline:
 
 ## 16. Repository Integrations
 
-DOI Forge supports optional metadata integrations per repository. An integration connects a repository to an external metadata source for validation, enrichment, or conflict detection. Sierra is the first implementation — the pattern is designed to accommodate others (ORCID, CrossRef, federal publications databases, etc.) without schema changes.
+DOI Forge supports optional integrations per repository that connect to external metadata sources. Integrations fall into two categories based on how they interact with DOIs:
+
+- **Batch integrations** run on a schedule against published DOIs, compare metadata with an external source, and surface conflicts for human resolution. Sierra is the first implementation.
+- **Lookup integrations** are triggered during form editing or submission, enriching a single record by querying an external service. ORCID verification and ROR org lookup are future examples.
+
+Both categories share the same `repository_integrations` table for credentials and configuration. The distinction is in the PHP interface and when they run.
+
+Landing page URL monitoring (§10) is **not** an integration — it is a core DOI Forge responsibility that runs on every deployment without credentials or configuration. It is a health check, not a metadata source.
 
 ### 16.1 Design
 
-Integration types are PHP handler classes. Integration instances are database records. The handler knows how to connect, sync, and compare — the record holds the credentials and config.
+Integration *types* are PHP handler classes (global). Integration *instances* are database records (per repository). The handler knows how to connect and operate — the record holds the credentials and config.
+
+A repository can have multiple integrations of different types (Sierra + ORCID). Each integration type can only be attached once per repository — enforced by a unique constraint on `(repository_id, type)`.
 
 ```
 app/
   Integrations/
-    IntegrationInterface.php
-    BaseIntegration.php
+    BatchIntegrationInterface.php
+    LookupIntegrationInterface.php
+    LookupResult.php
     Sierra/
-      SierraIntegration.php
+      SierraIntegration.php          ← implements BatchIntegrationInterface
     Orcid/
-      OrcidIntegration.php   ← future
+      OrcidLookupIntegration.php     ← future, implements LookupIntegrationInterface
+    Ror/
+      RorLookupIntegration.php       ← future, implements LookupIntegrationInterface
+```
+
+**Batch integrations** iterate published DOIs, compare with an external source, and produce conflict records:
+
+```php
+interface BatchIntegrationInterface
+{
+    public function type(): string;
+
+    /** Run the full sync cycle: iterate DOIs, compare, produce conflicts. */
+    public function sync(RepositoryIntegration $integration): void;
+}
+```
+
+Comparison logic is internal to each batch integration — how a Sierra bib record maps to DataCite fields is Sierra-specific knowledge that doesn't belong on a shared interface.
+
+**Lookup integrations** query an external service for a single identifier and return typed enrichment data. They are called from the form editor or at submission time — not on a schedule:
+
+```php
+interface LookupIntegrationInterface
+{
+    public function type(): string;
+
+    /** Look up a single identifier and return enrichment data. */
+    public function lookup(RepositoryIntegration $integration, string $identifier): LookupResult;
+}
 ```
 
 ```php
-interface IntegrationInterface
+final class LookupResult
 {
-    public function type(): string;
-    public function sync(RepositoryIntegration $integration): void;
-    public function compare(Doi $doi, mixed $externalRecord): array;
+    public function __construct(
+        public readonly bool $found,
+        public readonly ?array $data,      // enrichment data to offer the editor
+        public readonly ?string $error,    // human-readable if lookup failed
+    ) {}
 }
 ```
+
+Lookup results are **offered** to the editor, not applied automatically. The editor sees "ORCID 0000-0002-1234-5678 resolves to Jane Smith, University of Ottawa" and chooses whether to accept the enrichment. This keeps the human in the loop for published metadata.
 
 ### 16.2 Schema
 
@@ -1209,16 +1255,18 @@ interface IntegrationInterface
 ```php
 $table->id();
 $table->foreignId('repository_id')->constrained()->cascadeOnDelete();
-$table->string('type');               // 'sierra' | 'orcid' | 'crossref' | ...
+$table->string('type');               // 'sierra' | 'orcid' | 'ror' | ...
 $table->boolean('enabled')->default(false);
-$table->string('schedule')->nullable(); // cron expression, null = manual only
+$table->string('schedule')->nullable(); // cron expression, null = manual only (batch integrations only)
 $table->json('credentials');          // encrypted, shape varies by type
 $table->json('config')->nullable();   // type-specific settings
-$table->timestamp('last_synced_at')->nullable();
+$table->timestamp('last_synced_at')->nullable(); // batch integrations only
 $table->timestamps();
+
+$table->unique(['repository_id', 'type']); // one instance per type per repository
 ```
 
-**`integration_sync_conflicts`** — pending conflicts awaiting human resolution:
+**`integration_sync_conflicts`** — pending conflicts from batch integrations awaiting human resolution:
 
 ```php
 $table->id();
@@ -1226,7 +1274,7 @@ $table->foreignId('doi_id')->constrained('dois');
 $table->foreignId('integration_id')
       ->constrained('repository_integrations')
       ->cascadeOnDelete();
-$table->string('external_id');        // Sierra bib ID, ORCID ID, etc.
+$table->string('external_id');        // Sierra bib ID, etc.
 $table->json('external_data');        // what the external source has
 $table->json('local_data');           // what DOI Forge / DataCite has
 $table->json('diff');                 // computed field-level diff
@@ -1238,14 +1286,17 @@ $table->foreignId('resolved_by')
       ->nullOnDelete();
 $table->timestamp('resolved_at')->nullable();
 $table->timestamps();
+
+$table->unique(['doi_id', 'integration_id'], 'unique_pending_conflict')
+      ->where('status', 'pending'); // only one pending conflict per DOI per integration
 ```
 
-### 16.3 Sierra Integration
+### 16.3 Sierra Integration (Batch)
 
 The Sierra integration uses `vincentauger/sierra-php-sdk` to search the library catalogue by DOI URL. It runs only on repositories where it is enabled and only against `published` DOIs — drafts are never synced.
 
 ```php
-final class SierraIntegration extends BaseIntegration
+final class SierraIntegration implements BatchIntegrationInterface
 {
     public function type(): string { return 'sierra'; }
 
@@ -1260,37 +1311,64 @@ final class SierraIntegration extends BaseIntegration
         Doi::where('repository_id', $integration->repository_id)
             ->where('state', DoiState::Published)
             ->chunkById(100, function ($dois) use ($sierra, $integration) {
-              $dois->each(function (Doi $doi) use ($sierra, $integration) {
-                $results = $sierra->send(
-                    new GetSearchBib('https://doi.org/' . $doi->doi)
-                );
+                $dois->each(function (Doi $doi) use ($sierra, $integration) {
+                    $results = $sierra->send(
+                        new GetSearchBib('https://doi.org/' . $doi->doi)
+                    );
 
-                if ($results->count === 0) {
-                    // Not catalogued in Sierra yet — skip
-                    return;
-                }
+                    if ($results->count === 0) {
+                        return; // not catalogued in Sierra yet
+                    }
 
-                $diff = $this->compare($doi, $results->entries[0]);
+                    $diff = $this->compare($doi, $results->entries[0]);
 
-                if (!empty($diff)) {
-                    IntegrationSyncConflict::create([
-                        'doi_id'         => $doi->id,
-                        'integration_id' => $integration->id,
-                        'external_id'    => $results->entries[0]->id,
-                        'external_data'  => $results->entries[0]->toArray(),
-                        'local_data'     => $doi->form_data,
-                        'diff'           => $diff,
-                    ]);
-                }
-              });
+                    if (! empty($diff)) {
+                        IntegrationSyncConflict::updateOrCreate(
+                            [
+                                'doi_id'         => $doi->id,
+                                'integration_id' => $integration->id,
+                                'status'         => 'pending',
+                            ],
+                            [
+                                'external_id'   => $results->entries[0]->id,
+                                'external_data' => $results->entries[0]->toArray(),
+                                'local_data'    => $doi->form_data,
+                                'diff'          => $diff,
+                            ],
+                        );
+                    }
+                });
             });
 
         $integration->update(['last_synced_at' => now()]);
     }
+
+    /** Compare a DOI's form_data with a Sierra bib record and return field-level diffs. */
+    private function compare(Doi $doi, BibObject $bib): array
+    {
+        // Sierra-specific field mapping and comparison logic
+        // Returns an array of field-level diffs, empty if metadata matches
+    }
 }
 ```
 
-### 16.4 Conflict Resolution
+### 16.4 Lookup Integration Example (Future)
+
+```php
+final class OrcidLookupIntegration implements LookupIntegrationInterface
+{
+    public function type(): string { return 'orcid'; }
+
+    public function lookup(RepositoryIntegration $integration, string $orcid): LookupResult
+    {
+        // Query ORCID public API, return name + affiliation for the editor to review
+    }
+}
+```
+
+Lookup integrations are called from the form editor via an Inertia action. The frontend sends the identifier (e.g. an ORCID), the backend resolves which `LookupIntegrationInterface` to use based on the repository's enabled integrations, and the result is returned as typed props. The editor decides whether to accept the enrichment.
+
+### 16.5 Conflict Resolution (Batch Integrations)
 
 Conflicts are surfaced in the DOI Forge UI as a per-repository inbox. A user with appropriate permissions reviews each conflict and chooses:
 
@@ -1300,11 +1378,11 @@ Conflicts are surfaced in the DOI Forge UI as a per-repository inbox. A user wit
 
 All resolutions are recorded in the activity log with full attribution. Automated conflict resolution is intentionally not supported — published DOIs should not be silently overwritten.
 
-Conflicts are deduplicated on `(doi_id, integration_id)` — only one pending conflict can exist per DOI per integration. If a sync run detects a diff for a DOI that already has an unresolved conflict, the existing conflict is updated rather than creating a duplicate.
+Conflicts are deduplicated on `(doi_id, integration_id)` — only one pending conflict can exist per DOI per integration. If a sync run detects a diff for a DOI that already has an unresolved conflict, the existing conflict is updated with the latest external data rather than creating a duplicate.
 
-### 16.5 Scheduling
+### 16.6 Scheduling (Batch Integrations)
 
-The sync dispatcher runs hourly and checks each enabled integration against its cron schedule:
+The sync dispatcher runs hourly and checks each enabled batch integration against its cron schedule:
 
 ```php
 // routes/console.php
@@ -1319,9 +1397,82 @@ Schedule::call(function () {
 })->hourly();
 ```
 
-Integrations without a schedule can be triggered manually from the repository admin UI.
+Only batch integrations use scheduling. Lookup integrations are triggered on demand from the form editor. Batch integrations without a schedule can be triggered manually from the repository admin UI.
 
-## 17. Extension Packages
+---
+
+## 17. DOI Import & Onboarding
+
+When an institution adopts DOI Forge, existing DOIs under their DataCite prefix need to be brought under governance. This is a one-time onboarding step — after import, DOI Forge is the single gateway to the repository and all new DOIs flow through the standard workflow.
+
+### 17.1 Import Model
+
+The architecture supports import naturally because `form_data` is pure DataCite JSON (§23.9). The SDK fetches a DOI from DataCite and the response maps directly to `form_data` — no translation layer.
+
+```php
+$dataciteRecord = $sdk->getDoi('10.1234/existing-doi');
+
+$doi = Doi::create([
+    'repository_id' => $repository->id,
+    'form_data'     => $dataciteRecord->attributes->toArray(),
+    'doi'           => $dataciteRecord->doi,
+    'state'         => DoiState::from($dataciteRecord->attributes->state),
+    'submitted_by'  => $importingAdmin->id,
+    'published_at'  => $dataciteRecord->attributes->registered,
+]);
+
+activity()
+    ->on($doi)
+    ->withProperties(['source' => 'datacite_import'])
+    ->log('doi.imported');
+```
+
+### 17.2 State Mapping on Import
+
+| DataCite state | DOI Forge state | Notes |
+|---|---|---|
+| `findable` | `published` | Already public, `published_at` set from DataCite `registered` date |
+| `draft` | `draft` | Exists but not published, can be edited and submitted normally |
+| `registered` | `published` | Metadata-only (not indexed), treated as published since it was intentionally created |
+
+### 17.3 Import Commands
+
+**Bulk import** — for initial onboarding:
+
+```bash
+php artisan dois:import {repository} --all
+```
+
+Fetches all DOIs under the repository's prefix from DataCite via the SDK's list endpoint. For each DOI not already in DOI Forge (checked by `doi` column uniqueness), creates a local record. Skipped DOIs are logged. Progress is reported to the console.
+
+**Single DOI import** — for ad-hoc cases:
+
+```bash
+php artisan dois:import {repository} --doi=10.1234/specific
+```
+
+Also available as an admin UI action on the repository page ("Import from DataCite").
+
+### 17.4 What Import Does Not Do
+
+- **Validators do not run at import time.** Imported DOIs are already published — blocking import because they don't meet the current standard defeats the purpose. Validators run when someone *edits* an imported DOI and resubmits for approval. This naturally brings legacy records up to standard over time.
+- **No profile is assigned.** Imported DOIs were not created through a profile workflow. The activity log records `doi.imported` as the provenance.
+- **No review record is created.** The DOI was approved (or published directly) in the previous system. That history lives in DataCite's own activity log, not in DOI Forge.
+- **URL monitoring starts immediately.** Imported published DOIs are included in the daily URL monitoring schedule.
+
+### 17.5 Governance After Import
+
+After the bulk import, the institution's previous system (e.g. OSP) must stop creating DOIs directly against DataCite. From this point forward:
+
+- The OSP uses the DOI Forge API (`POST /api/v1/repositories/{repository}/dois/draft`) with `external_reference` for traceability
+- All new DOIs go through DOI Forge's approval workflow before publication
+- DOI Forge is the single gateway to the repository — this is the governance contract
+
+Running two systems against the same DataCite repository undermines the entire value proposition of DOI Forge. The import is a cutover, not a bridge.
+
+---
+
+## 18. Extension Packages
 
 Profiles are database records managed via the admin UI — no code changes required (see §4.2). Validators are PHP classes in `app/Validators/` registered via the `validators` database table through a seeder (see §4.3.1).
 
@@ -1331,12 +1482,12 @@ This pattern provides a clear path to Composer packages if a second institution 
 
 ---
 
-## 18. Open Source Considerations
+## 19. Open Source Considerations
 
 DOI Forge is designed to be adopted by any institution with minimal effort. Principles:
 
 - **Opinionated but configurable** — sensible defaults, institution-specific values in config
-- **Extension-ready** — profiles are database records (standard DataCite JSON), validators are PHP classes registered via a database seeder with stable IDs, with a clear path to Composer packages if other institutions adopt the application (see §17)
+- **Extension-ready** — profiles are database records (standard DataCite JSON), validators are PHP classes registered via a database seeder with stable IDs, with a clear path to Composer packages if other institutions adopt the application (see §18)
 - **Standard PHP deployment** — deploys to any Ubuntu VM with Nginx + PHP 8.4-FPM + Redis. Provisioning script included. No containers required
 - **English and French** — fully bilingual out of the box, no rework needed
 
@@ -1344,7 +1495,7 @@ A `CONTRIBUTING.md` and a seed command for example profiles will be provided. A 
 
 ---
 
-## 19. Out of Scope (v1)
+## 20. Out of Scope (v1)
 
 - Full DataCite API pass-through proxy
 - DOI local sync / mirror
@@ -1358,7 +1509,7 @@ A `CONTRIBUTING.md` and a seed command for example profiles will be provided. A 
 
 ---
 
-## 20. Open Questions
+## 21. Open Questions
 
 - Which GC subject vocabulary should be the default for `gccore` — the Government of Canada Core Subject Thesaurus?
 - Should the Horizon dashboard be exposed publicly (admin-gated) or only on an internal network interface?
@@ -1369,7 +1520,7 @@ _Document maintained in the DOI Forge repository under `/docs/design.md`_
 
 ---
 
-## 21. Database Schema
+## 22. Database Schema
 
 ```mermaid
 erDiagram
@@ -1413,7 +1564,6 @@ erDiagram
   dois {
     int id PK
     int repository_id FK
-    int profile_id FK
     int submitted_by FK
     string doi
     string state
@@ -1494,7 +1644,6 @@ erDiagram
   repositories ||--o{ profiles : "has"
   repositories ||--o{ dois : "has"
   repositories ||--o{ repository_integrations : "has"
-  profiles ||--o{ dois : "uses"
   dois ||--o{ doi_reviews : "reviewed-by"
   users ||--o{ doi_reviews : "reviews"
   users ||--o{ dois : "submits"
@@ -1506,11 +1655,11 @@ erDiagram
 
 ---
 
-## 22. Design Decisions & Rationale
+## 23. Design Decisions & Rationale
 
 This section records key decisions made during design, and why, to prevent future contributors from relitigating settled questions.
 
-### 22.1 No Retroactive Author Sync
+### 23.1 No Retroactive Author Sync
 
 **Decision:** DOI Forge does not attempt to retroactively sync author metadata (including ORCID) from the OSP or any other external system after a DOI is published.
 
@@ -1520,49 +1669,49 @@ The correct approach is to capture the best available metadata at submission tim
 
 **If this is revisited:** A reliable implementation requires a stable shared author identifier (e.g. a ULID on OSP author records) established at submission time and stored in an `integration_author_links` table owned by the OSP integration handler. This is a non-trivial feature that should be driven by demonstrated post-launch user need, not speculative design.
 
-### 22.2 One Validator Per Repository, Not Per Profile or Per DOI
+### 23.2 One Validator Per Repository, Not Per Profile or Per DOI
 
 **Decision:** Each repository is assigned a single metadata standard validator. Validators are not configured at the profile or DOI level.
 
 **Rationale:** A repository maps one-to-one with a DataCite prefix, which represents a single collection type (publications, data, maps). Each collection type has one metadata standard. Attaching validators to profiles would require repeating the same standard across every profile in a repository, or introduce merge/ordering complexity if profiles could override the repository standard. Attaching validators to individual DOIs would create a governance escape hatch — the whole point of DOI Forge is that individuals cannot bypass institutional policy. Institutions that publish across different resource types should use separate repositories with separate prefixes, matching how DataCite provisions accounts.
 
-### 22.3 Three Severity Levels (Error, Warning, Info)
+### 23.3 Three Severity Levels (Error, Warning, Info)
 
 **Decision:** Validators return results at three severity levels: error (hard block), warning (must acknowledge), and info (advisory, never blocks).
 
 **Rationale:** Two levels (error/warning) force a binary choice — either a metadata gap blocks publication or it doesn't. In practice, metadata standards have three tiers: mandatory fields, strongly recommended fields, and best-practice guidance. The `info` level captures "this would improve your metadata" without burdening the approver with acknowledgement checkboxes for every nice-to-have. Running validators at submission catches errors early — the editor cannot submit with errors. Warnings and info surface at both stages. At approval, errors block, warnings require acknowledgement, and info is shown for awareness only.
 
-### 22.4 Validators Registered via Database Seeder, Not Auto-Discovery
+### 23.4 Validators Registered via Database Seeder, Not Auto-Discovery
 
 **Decision:** Available validators are stored in a `validators` database table maintained by a seeder with stable IDs, rather than auto-discovered from the filesystem.
 
 **Rationale:** Convention-based auto-discovery (deriving slugs from class names) is fragile — renaming a class silently changes its slug, breaking every repository assignment that referenced the old slug. A database seeder with explicit stable IDs provides: rename safety (the ID and slug survive class renames), versioning (a v2 standard is a new row, coexisting with v1 during transition), and a concrete list for the admin UI dropdown. The cost is one seeder row per validator — trivial given that the total number of metadata standards in any deployment will be small (typically 2–5).
 
-### 22.5 PostgreSQL over SQLite
+### 23.5 PostgreSQL over SQLite
 
 **Decision:** PostgreSQL 18 is the database engine.
 
 **Rationale:** DOI Forge runs queue workers (Horizon) alongside web request handlers concurrently. SQLite's file-level write lock creates contention under that pattern — a background URL verification job and an autosave request will collide. PostgreSQL handles concurrent writers cleanly. It also provides proper JSON operators for querying `form_data`, full-text search if needed later, and production parity that prevents the class of bugs where SQLite's more permissive type coercion and case-insensitive `LIKE` mask issues that surface in production. Spatie Laravel Backup handles PostgreSQL dumps natively, so operational complexity is equivalent.
 
-### 22.6 No Event Sourcing
+### 23.6 No Event Sourcing
 
 **Decision:** Standard Eloquent models with Spatie Activity Log, not event sourcing.
 
 **Rationale:** The audit requirements are real but well served by Spatie Activity Log combined with DataCite's own activity log. Event sourcing was considered (Laravel Verbs) but rejected because: the domain is simple, replay is never needed independently of DataCite, externally minted DOIs have no event history creating an impedance mismatch, and the operational and contribution overhead is not justified by the benefits.
 
-### 22.7 Profiles as Data, Not Code
+### 23.7 Profiles as Data, Not Code
 
 **Decision:** Metadata profiles are database records containing DataCite-shaped JSON, not PHP classes.
 
 **Rationale:** A profile is just a seed — a standard DataCite JSON object that pre-fills the form when a new DOI is started. Storing it in the database means profiles can be created and modified via the admin UI without code changes, PRs, or deployments. The same Vue components used to compose DOI metadata can be reused to build a profile's seed data, keeping the experience consistent. Validators — which do require logic — remain as PHP classes registered via the `validators` database table (see §4.3.1); repositories reference them by FK.
 
-### 22.8 Spatie Laravel Data + Wayfinder Stable for Type Safety
+### 23.8 Spatie Laravel Data + Wayfinder Stable for Type Safety
 
 **Decision:** Use Spatie Laravel Data for typed Data objects with colocated validation and auto-generated TypeScript (via TypeScript Transformer). Use Wayfinder stable for typed route/action functions. The SDK (`datacite-php-sdk`) remains framework-agnostic — Data classes live in DOI Forge only.
 
 **Rationale:** The DataCite metadata shape is deeply nested. Writing validation as flat FormRequest rule arrays is verbose and error-prone for structures like `creators[].nameIdentifiers[]` and `relatedItems[].contributors[]`. Data classes provide colocated validation on each nested structure, clean controller type-hints, and auto-generated TypeScript for all page props, form payloads, and API responses — not just the DataCite shape. This eliminates manually maintained TypeScript files entirely. Wayfinder `next` was considered but rejected because as of March 2026 it remains in beta with an unstable API and known performance issues. This can be revisited when it reaches a stable release.
 
-### 22.9 form_data as Pure DataCite JSON
+### 23.9 form_data as Pure DataCite JSON
 
 **Decision:** The `form_data` column on the `dois` table contains DataCite-shaped JSON only. No internal identifiers (OSP author IDs etc.) are stored there.
 
