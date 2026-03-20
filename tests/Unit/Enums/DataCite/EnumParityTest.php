@@ -17,7 +17,7 @@ use VincentAuger\DataCiteSdk\Enums\RelationType as SdkRelationType;
 use VincentAuger\DataCiteSdk\Enums\ResourceTypeGeneral as SdkResourceTypeGeneral;
 use VincentAuger\DataCiteSdk\Enums\TitleType as SdkTitleType;
 
-it('ResourceTypeGeneral has same string values as SDK enum', function () {
+it('ResourceTypeGeneral has same string values as SDK enum', function (): void {
     $ourCases = array_column(ResourceTypeGeneral::cases(), 'value');
     $sdkCases = array_column(SdkResourceTypeGeneral::cases(), 'value');
 
@@ -27,7 +27,7 @@ it('ResourceTypeGeneral has same string values as SDK enum', function () {
     expect($ourCases)->toBe($sdkCases);
 });
 
-it('ContributorType has same string values as SDK enum', function () {
+it('ContributorType has same string values as SDK enum', function (): void {
     $ourCases = array_column(ContributorType::cases(), 'value');
     $sdkCases = array_column(SdkContributorType::cases(), 'value');
 
@@ -37,7 +37,7 @@ it('ContributorType has same string values as SDK enum', function () {
     expect($ourCases)->toBe($sdkCases);
 });
 
-it('RelationType has same string values as SDK enum', function () {
+it('RelationType has same string values as SDK enum', function (): void {
     $ourCases = array_column(RelationType::cases(), 'value');
     $sdkCases = array_column(SdkRelationType::cases(), 'value');
 
@@ -47,7 +47,7 @@ it('RelationType has same string values as SDK enum', function () {
     expect($ourCases)->toBe($sdkCases);
 });
 
-it('DateType has same string values as SDK enum', function () {
+it('DateType has same string values as SDK enum', function (): void {
     $ourCases = array_column(DateType::cases(), 'value');
     $sdkCases = array_column(SdkDateType::cases(), 'value');
 
@@ -57,7 +57,7 @@ it('DateType has same string values as SDK enum', function () {
     expect($ourCases)->toBe($sdkCases);
 });
 
-it('DescriptionType has same string values as SDK enum', function () {
+it('DescriptionType has same string values as SDK enum', function (): void {
     $ourCases = array_column(DescriptionType::cases(), 'value');
     $sdkCases = array_column(SdkDescriptionType::cases(), 'value');
 
@@ -67,7 +67,7 @@ it('DescriptionType has same string values as SDK enum', function () {
     expect($ourCases)->toBe($sdkCases);
 });
 
-it('TitleType has same string values as SDK enum', function () {
+it('TitleType has same string values as SDK enum', function (): void {
     $ourCases = array_column(TitleType::cases(), 'value');
     $sdkCases = array_column(SdkTitleType::cases(), 'value');
 
@@ -77,7 +77,7 @@ it('TitleType has same string values as SDK enum', function () {
     expect($ourCases)->toBe($sdkCases);
 });
 
-it('NameType has same string values as SDK enum', function () {
+it('NameType has same string values as SDK enum', function (): void {
     $ourCases = array_column(NameType::cases(), 'value');
     $sdkCases = array_column(SdkNameType::cases(), 'value');
 
@@ -87,7 +87,7 @@ it('NameType has same string values as SDK enum', function () {
     expect($ourCases)->toBe($sdkCases);
 });
 
-it('RelatedIdentifierType has same string values as SDK enum', function () {
+it('RelatedIdentifierType has same string values as SDK enum', function (): void {
     $ourCases = array_column(RelatedIdentifierType::cases(), 'value');
     $sdkCases = array_column(SdkRelatedIdentifierType::cases(), 'value');
 
@@ -97,7 +97,7 @@ it('RelatedIdentifierType has same string values as SDK enum', function () {
     expect($ourCases)->toBe($sdkCases);
 });
 
-it('app enums can be converted to SDK enums via value', function () {
+it('app enums can be converted to SDK enums via value', function (): void {
     expect(SdkResourceTypeGeneral::from(ResourceTypeGeneral::Dataset->value))->toBe(SdkResourceTypeGeneral::DATASET);
     expect(SdkTitleType::from(TitleType::Subtitle->value))->toBe(SdkTitleType::SUBTITLE);
     expect(SdkNameType::from(NameType::Personal->value))->toBe(SdkNameType::PERSONAL);

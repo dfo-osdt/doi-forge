@@ -22,7 +22,7 @@ function minimalDoiData(): DoiData
     );
 }
 
-it('creates DoiData from array with required fields', function () {
+it('creates DoiData from array with required fields', function (): void {
     $data = DoiData::from([
         'creators' => [['name' => 'Smith, John']],
         'titles' => [['title' => 'Test Dataset']],
@@ -39,7 +39,7 @@ it('creates DoiData from array with required fields', function () {
         ->and($data->types->resourceTypeGeneral)->toBe(ResourceTypeGeneral::Dataset);
 });
 
-it('casts enum values when creating from array', function () {
+it('casts enum values when creating from array', function (): void {
     $data = DoiData::from([
         'creators' => [['name' => 'Smith, John', 'nameType' => 'Personal']],
         'titles' => [['title' => 'Test', 'titleType' => 'Subtitle']],
@@ -53,7 +53,7 @@ it('casts enum values when creating from array', function () {
         ->and($data->titles[0]->titleType)->toBe(TitleType::Subtitle);
 });
 
-it('serializes to array preserving enum values as strings', function () {
+it('serializes to array preserving enum values as strings', function (): void {
     $data = minimalDoiData();
     $array = $data->toArray();
 
@@ -64,7 +64,7 @@ it('serializes to array preserving enum values as strings', function () {
         ->and($array['types']['resourceTypeGeneral'])->toBe('Dataset');
 });
 
-it('optional fields default correctly when not provided', function () {
+it('optional fields default correctly when not provided', function (): void {
     $data = minimalDoiData();
 
     // String/object optional fields use Optional sentinel
@@ -91,7 +91,7 @@ it('optional fields default correctly when not provided', function () {
         ->and($data->fundingReferences)->toBe([]);
 });
 
-it('accepts publisher as string', function () {
+it('accepts publisher as string', function (): void {
     $data = DoiData::from([
         'creators' => [['name' => 'Smith, John']],
         'titles' => [['title' => 'Test Dataset']],
@@ -104,7 +104,7 @@ it('accepts publisher as string', function () {
     expect($data->publisher)->toBe('Simple Publisher Name');
 });
 
-it('round-trips through array serialization', function () {
+it('round-trips through array serialization', function (): void {
     $original = minimalDoiData();
     $reconstructed = DoiData::from($original->toArray());
 

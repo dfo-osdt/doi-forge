@@ -39,7 +39,7 @@ function minimalInput(): DoiData
     );
 }
 
-it('createDraft sends correct payload and returns DoiData', function () {
+it('createDraft sends correct payload and returns DoiData', function (): void {
     $mockClient = new MockClient([
         CreateDOI::class => MockResponse::make(doiFixture(), 201),
     ]);
@@ -62,7 +62,7 @@ it('createDraft sends correct payload and returns DoiData', function () {
     $mockClient->assertSent(CreateDOI::class);
 });
 
-it('getDoi returns DoiData with inbound descriptions', function () {
+it('getDoi returns DoiData with inbound descriptions', function (): void {
     $mockClient = new MockClient([
         GetDOI::class => MockResponse::make(doiFixture(), 200),
     ]);
@@ -81,7 +81,7 @@ it('getDoi returns DoiData with inbound descriptions', function () {
     $mockClient->assertSent(GetDOI::class);
 });
 
-it('updateDoi sends PUT request and returns updated DoiData', function () {
+it('updateDoi sends PUT request and returns updated DoiData', function (): void {
     $mockClient = new MockClient([
         UpdateDOI::class => MockResponse::make(doiFixture(), 200),
     ]);
@@ -96,7 +96,7 @@ it('updateDoi sends PUT request and returns updated DoiData', function () {
     $mockClient->assertSent(UpdateDOI::class);
 });
 
-it('deleteDoi sends DELETE request', function () {
+it('deleteDoi sends DELETE request', function (): void {
     $mockClient = new MockClient([
         DeleteDOI::class => MockResponse::make([], 204),
     ]);
@@ -109,7 +109,7 @@ it('deleteDoi sends DELETE request', function () {
     $mockClient->assertSent(DeleteDOI::class);
 });
 
-it('maps publisher as PublisherData object from response', function () {
+it('maps publisher as PublisherData object from response', function (): void {
     $mockClient = new MockClient([
         GetDOI::class => MockResponse::make(doiFixture(), 200),
     ]);
@@ -123,7 +123,7 @@ it('maps publisher as PublisherData object from response', function () {
         ->and($result->publisher->name)->toBe('Zenodo');
 });
 
-it('datacite config resolves correctly', function () {
+it('datacite config resolves correctly', function (): void {
     expect(config('datacite.base_url'))->not->toBeEmpty()
         ->and(config('datacite'))->toHaveKey('base_url')
         ->and(config('datacite'))->toHaveKey('mailto');
