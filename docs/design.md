@@ -1,6 +1,6 @@
 # DOI Forge — System Design Document
 
-**Version:** 1.5 (Draft)
+**Version:** 1.6 (Draft)
 **Status:** In Progress
 **Language:** Bilingual (EN/FR)
 
@@ -147,8 +147,9 @@ DOI Forge deliberately stores only what is needed for governance. It does not mi
 
 | Table                                   | Purpose                                                                                                     |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `repositories`                          | DataCite repository config, encrypted credentials                                                           |
-| `profiles`                              | Metadata profiles — seed data (DoiData DTO), validator assignments, per repository                          |
+| `repositories`                          | DataCite repository config, encrypted credentials, validator assignment                                     |
+| `profiles`                              | Metadata profiles — seed data (DoiData DTO), per repository                                                 |
+| `validators`                            | Seeded registry of available metadata standard validators (stable IDs, slugs, class references)             |
 | `dois`                                  | Full DOI lifecycle from composing through publication — DataCite-shaped `form_data` autosaved incrementally |
 | `users`                                 | Local user records, created on first Entra login                                                            |
 | `personal_access_tokens`                | Sanctum API tokens (Spatie managed)                                                                         |
@@ -167,7 +168,9 @@ DOI browsing and detail views query the DataCite API directly via the SDK.
 
 ### 4.1 Repository
 
-A DataCite repository (one-to-one with a DataCite prefix). Holds encrypted credentials and is the top-level scope for all permissions and profiles.
+A DataCite repository (one-to-one with a DataCite prefix). Holds encrypted credentials and is the top-level scope for all permissions, profiles, and metadata quality enforcement.
+
+Each repository is assigned a single metadata standard validator — the quality gate for every DOI minted under that prefix. This keeps governance simple: one prefix, one set of credentials, one standard. Institutions that publish across different resource types (publications, data, maps) should use separate repositories with separate prefixes, each enforcing the appropriate standard.
 
 **Key fields:**
 
@@ -175,15 +178,18 @@ A DataCite repository (one-to-one with a DataCite prefix). Holds encrypted crede
 - `datacite_prefix` — e.g. `10.1234`
 - `datacite_repository_id` — encrypted
 - `datacite_password` — encrypted
+- `validator_id` — FK to `validators`, nullable (the metadata standard enforced for this repository)
 - `active` — boolean
 
 Credentials are stored using Laravel's built-in `encrypted` cast. They are never included in audit log payloads. Credential updates are logged as a named action (who rotated credentials, when) without recording the values themselves.
 
-Each department deployment will start with one repository and can add more as DataCite provisioning allows (e.g. separate prefixes for publications, data, maps).
+Each department deployment will start with one repository and can add more as DataCite provisioning allows (e.g. separate prefixes for publications, data, maps). Separate repositories for different resource types is the recommended pattern — it aligns with how DataCite provisions prefixes, keeps validators focused, and avoids requiring users to classify their submission at creation time.
 
 ### 4.2 Profile
 
-A profile is a database record scoped to a repository. It does two things: **seed the form** when a new DOI is started, and **declare which validators apply** to DOIs created from it.
+A profile is a database record scoped to a repository. Its single job is to **seed the form** when a new DOI is started — pre-filling repetitive metadata like publisher, series, ISSN, and organisation details so the user doesn't have to type them every time.
+
+Profiles do not own validator configuration. The metadata standard is set at the repository level (see §4.1). Profiles are variations within that standard — a "Technical Report" profile and a "Research Document" profile in the same publications repository both inherit the same quality gate.
 
 Profiles are managed via the admin UI — no code changes required to create, modify, or deactivate a profile.
 
@@ -192,7 +198,6 @@ Profiles are managed via the admin UI — no code changes required to create, mo
 - `repository_id` — FK, which repository this profile belongs to
 - `name_en`, `name_fr` — human-readable name
 - `data` — JSON, a serialized `DoiData` DTO that seeds `form_data` when a new DOI is created
-- `validators` — JSON array of validator slugs (e.g. `["datacite-recommended"]`)
 - `active` — boolean
 
 **The `data` column is a `DoiData` DTO.** It holds DataCite-shaped JSON — the same structure as `form_data` on the `dois` table and the same DTO passed to the DataCite SDK. When a user starts a new DOI, the profile's `data` is copied directly into the DOI's `form_data`. From that point the user owns the data entirely.
@@ -246,22 +251,25 @@ $doi = Doi::create([
 ]);
 ```
 
-The profile participates at two moments: when a new DOI is created (`data` seeds the form) and when the form is submitted or approved (`validators` are evaluated). After the first moment it is otherwise irrelevant — the user's `form_data` is the truth.
+The profile participates at one moment: when a new DOI is created (`data` seeds the form). After that it is otherwise irrelevant — the user's `form_data` is the truth. Metadata quality enforcement is handled by the repository's assigned validator (see §4.3).
 
 ### 4.3 Validators
 
 Validators express metadata quality rules that must pass before a DOI can be published. They are distinct from `required()` — required fields are a submission gate enforced by the editor, validators are a publication gate enforced at approval time.
 
-Validators are PHP classes in `app/Validators/`. Like profiles, they live in code: reviewed via PR, fully type-checked by Larastan, version-controlled.
+Each repository is assigned a single validator — one metadata standard per prefix. This keeps governance simple and avoids conflicting or overlapping rules. Institutions that publish across different resource types (publications, data, maps) use separate repositories with separate validators, matching how DataCite provisions prefixes.
+
+Validators are PHP classes in `app/Validators/`, reviewed via PR, fully type-checked by Larastan, version-controlled. Available validators are registered in a seeded `validators` database table with stable IDs, slugs, and class references (see §4.3.1).
 
 **Attachment point:**
 
-Each profile declares its validators as a JSON array of slugs (e.g. `["datacite-recommended"]`). When a DOI is submitted or approved, `ValidatorService` reads the slugs from the DOI's profile record and resolves each to a PHP class via `ValidatorRegistry`.
+Each repository declares its validator via a `validator_id` FK on the `repositories` table. When a DOI is submitted or approved, `ValidatorService` reads the validator from the DOI's repository and resolves it to the PHP class.
 
-**Two severity levels:**
+**Three severity levels:**
 
 - `error` — hard block. The approver cannot publish until the condition is resolved. The DOI must be rejected back to the editor.
-- `warning` — advisory. The approver sees the issue and must explicitly acknowledge it before approving. Does not block publication on its own.
+- `warning` — should be addressed but not required. The approver sees the issue and must explicitly acknowledge it before approving. Does not block publication on its own.
+- `info` — recommended best practice. Shown to the editor and approver as advisory guidance. Never blocks submission or approval. Represents the ideal metadata quality target.
 
 **Interface:**
 
@@ -283,6 +291,7 @@ enum ValidationSeverity
 {
     case Error;
     case Warning;
+    case Info;
 }
 
 final class ValidationResult
@@ -290,7 +299,7 @@ final class ValidationResult
     public function __construct(
         public readonly ValidationSeverity $severity,
         public readonly string $validator, // class name, for activity log
-        public readonly string $field,
+        public readonly string $field,     // dot-notation path, e.g. 'creators.0.nameIdentifiers'
         public readonly string $message,
     ) {}
 
@@ -303,35 +312,86 @@ final class ValidationResult
     {
         return new self(ValidationSeverity::Warning, $class, $field, $message);
     }
+
+    public static function info(string $class, string $field, string $message): self
+    {
+        return new self(ValidationSeverity::Info, $class, $field, $message);
+    }
 }
 ```
 
+#### 4.3.1 Validator Registry (Database-Seeded)
+
+Available validators are stored in a `validators` table maintained by a database seeder. This provides stable IDs that survive class renames, enables versioning, and gives the admin UI a concrete list of available standards.
+
+**Schema:**
+
+```php
+$table->id();
+$table->string('slug')->unique();      // e.g. 'dfo-publications'
+$table->string('class');                // e.g. App\Validators\DfoPublicationsMetadataStandard::class
+$table->string('name_en');              // human-readable name
+$table->string('name_fr');
+$table->timestamps();
+```
+
+**Seeder:**
+
+```php
+// database/seeders/ValidatorSeeder.php
+Validator::upsert([
+    [
+        'id' => 1,
+        'slug' => 'dfo-publications',
+        'class' => DfoPublicationsMetadataStandard::class,
+        'name_en' => 'DFO Publications Metadata Standard',
+        'name_fr' => 'Norme de métadonnées des publications du MPO',
+    ],
+    [
+        'id' => 2,
+        'slug' => 'dfo-data',
+        'class' => DfoDataMetadataStandard::class,
+        'name_en' => 'DFO Data Metadata Standard',
+        'name_fr' => 'Norme de métadonnées des données du MPO',
+    ],
+    [
+        'id' => 3,
+        'slug' => 'datacite-minimum',
+        'class' => DataciteMinimumStandard::class,
+        'name_en' => 'DataCite Minimum Standard',
+        'name_fr' => 'Norme minimale DataCite',
+    ],
+], ['id'], ['slug', 'class', 'name_en', 'name_fr']);
+```
+
+Adding a new validator is: create the PHP class, add a row to the seeder, run the seeder. Renaming a class is a seeder update — the stable ID and slug are unchanged, so repository assignments are unaffected. Versioning is also straightforward — `dfo-publications-v2` is a new row; the admin swaps the repository's `validator_id` when ready.
+
+**Boot-time integrity check:**
+
+On application boot, a service provider verifies that every `class` referenced in the `validators` table exists and implements `ValidatorInterface`. In local/testing environments this throws an exception; in production it logs a critical warning. This catches stale references after a class rename where the seeder wasn't updated.
+
 **`ValidatorService`:**
 
-`ValidatorService` is the single call site for running validators. It reads the validator slugs from the DOI's profile record, resolves each slug to a class via `ValidatorRegistry`, and returns the combined results.
+`ValidatorService` is the single call site for running validators. It reads the validator from the DOI's repository and returns the results.
 
 ```php
 final class ValidatorService
 {
     /**
-     * Run all validators for the given DOI and return every result.
-     * Callers inspect severity to decide whether to block or surface warnings.
+     * Run the repository's validator and return every result.
+     * Callers inspect severity to decide whether to block, require acknowledgement, or show as advisory.
      *
      * @return ValidationResult[]
      */
     public function run(Doi $doi, DoiData $data): array
     {
-        $profileSlugs = $doi->profile?->validators ?? [];
+        $validator = $doi->repository->validator;
 
-        $classes = collect($profileSlugs)
-            ->map(fn (string $slug) => ValidatorRegistry::resolve($slug))
-            ->filter()
-            ->unique()
-            ->all();
+        if (! $validator) {
+            return [];
+        }
 
-        return collect($classes)
-            ->flatMap(fn (string $class) => app($class)->validate($data))
-            ->all();
+        return app($validator->class)->validate($data);
     }
 }
 ```
@@ -341,26 +401,33 @@ The caller constructs `DoiData::from($doi->form_data)` once and passes the same 
 **Example:**
 
 ```php
-final class DataCiteRecommendedFieldsValidator implements ValidatorInterface
+final class DfoPublicationsMetadataStandard implements ValidatorInterface
 {
     public function name(): string
     {
-        return 'DataCite Recommended Fields';
+        return 'DFO Publications Metadata Standard';
     }
 
     public function validate(DoiData $data): array
     {
         $results = [];
 
-        if ($data->descriptions->isEmpty()) {
-            $results[] = ValidationResult::warning(static::class, 'descriptions', 'At least one description is strongly recommended by DataCite.');
+        // Error — hard block
+        if ($data->titles->isEmpty()) {
+            $results[] = ValidationResult::error(static::class, 'titles', 'At least one title is required.');
         }
 
-        $hasNameIdentifier = $data->creators
+        // Warning — should have, acknowledge to proceed
+        if ($data->descriptions->isEmpty()) {
+            $results[] = ValidationResult::warning(static::class, 'descriptions', 'At least one description is strongly recommended.');
+        }
+
+        // Info — best practice, never blocks
+        $hasOrcid = $data->creators
             ->some(fn (CreatorData $creator) => $creator->nameIdentifiers->isNotEmpty());
 
-        if (!$hasNameIdentifier) {
-            $results[] = ValidationResult::warning(static::class, 'creators', 'At least one creator should have a name identifier (e.g. ORCID).');
+        if (! $hasOrcid) {
+            $results[] = ValidationResult::info(static::class, 'creators.0.nameIdentifiers', 'Including an ORCID for at least one creator improves discoverability.');
         }
 
         return $results;
@@ -370,14 +437,14 @@ final class DataCiteRecommendedFieldsValidator implements ValidatorInterface
 
 **Where validators run:**
 
-1. **At submission (hard block)** — validators run before the DOI enters `pending_approval`. Any `error`-level result blocks submission. Warnings are surfaced to the editor so they can address issues before the DOI reaches the approver's inbox — warnings do not block submission.
-2. **At approval (gate)** — validators run again before the approval is processed. Any `error`-level result blocks approval. `warning`-level results are shown to the approver, who must acknowledge each one before the approval proceeds.
+1. **At submission (hard block)** — validators run before the DOI enters `pending_approval`. Any `error`-level result blocks submission. Warnings and info results are surfaced to the editor so they can address issues before the DOI reaches the approver's inbox — neither blocks submission.
+2. **At approval (gate)** — validators run again before the approval is processed. Any `error`-level result blocks approval. `warning`-level results are shown to the approver, who must acknowledge each one before the approval proceeds. `info`-level results are shown for awareness but require no action.
 
 Running validators at submission gives editors early feedback. Running them again at approval ensures the gate is enforced on the final `form_data` state, not whatever the editor saw when they originally submitted.
 
 **Approver UI:**
 
-The approval view shows a validator results panel. Errors are listed with a clear block indicator. Warnings have an acknowledgement checkbox per item. The Approve button is disabled until all errors are resolved and all warnings acknowledged.
+The approval view shows a validator results panel. Errors are listed with a clear block indicator. Warnings have an acknowledgement checkbox per item. Info items are shown as advisory text. The Approve button is disabled until all errors are resolved and all warnings acknowledged.
 
 **Activity log:**
 
@@ -1177,15 +1244,11 @@ Integrations without a schedule can be triggered manually from the repository ad
 
 ## 17. Extension Packages
 
-Profiles are database records managed via the admin UI — no code changes required (see §4.2). Validators are PHP classes registered through a single `ValidatorRegistry` in `AppServiceProvider::boot()`:
+Profiles are database records managed via the admin UI — no code changes required (see §4.2). Validators are PHP classes in `app/Validators/` registered via the `validators` database table through a seeder (see §4.3.1).
 
-```php
-ValidatorRegistry::register('datacite-recommended', DataCiteRecommendedFieldsValidator::class);
-```
+Adding a new metadata standard is: create the PHP class implementing `ValidatorInterface`, add a row to `ValidatorSeeder`, run the seeder. The class is reviewed via PR, type-checked by Larastan, and version-controlled. The seeder provides stable IDs that survive renames and enable versioning.
 
-The registry maps slugs to classes. Profile records reference validators by slug in their `validators` JSON column. This keeps the mechanism explicit and trivially type-checked by Larastan. Adding a validator is a one-line change in the service provider, reviewed via PR alongside the class itself.
-
-The registry pattern also provides a clear path to Composer packages if a second institution adopts DOI Forge — a package would simply ship a service provider that makes the same registration call, auto-discovered by Laravel. That step is deferred until there is real demand for it.
+This pattern provides a clear path to Composer packages if a second institution adopts DOI Forge — a package would ship its own validator classes and a seeder, with the service provider running a boot-time integrity check to ensure all referenced classes exist. That step is deferred until there is real demand for it.
 
 ---
 
@@ -1194,7 +1257,7 @@ The registry pattern also provides a clear path to Composer packages if a second
 DOI Forge is designed to be adopted by any institution with minimal effort. Principles:
 
 - **Opinionated but configurable** — sensible defaults, institution-specific values in config
-- **Extension-ready** — profiles are database records (standard DataCite JSON), validators are registered via a simple registry pattern, with a clear path to Composer packages if other institutions adopt the application (see §17)
+- **Extension-ready** — profiles are database records (standard DataCite JSON), validators are PHP classes registered via a database seeder with stable IDs, with a clear path to Composer packages if other institutions adopt the application (see §17)
 - **Standard PHP deployment** — deploys to any Ubuntu VM with Nginx + PHP 8.4-FPM + Redis. Provisioning script included. No containers required
 - **English and French** — fully bilingual out of the box, no rework needed
 
@@ -1247,6 +1310,14 @@ erDiagram
     string datacite_prefix
     string datacite_repository_id
     string datacite_password
+    int validator_id FK
+  }
+  validators {
+    int id PK
+    string slug
+    string class
+    string name_en
+    string name_fr
   }
   profiles {
     int id PK
@@ -1254,7 +1325,6 @@ erDiagram
     string name_en
     string name_fr
     json data
-    json validators
     bool active
   }
   dois {
@@ -1328,6 +1398,7 @@ erDiagram
     int model_id
     int team_id
   }
+  validators ||--o{ repositories : "enforces"
   repositories ||--o{ profiles : "has"
   repositories ||--o{ dois : "has"
   repositories ||--o{ repository_integrations : "has"
@@ -1355,37 +1426,49 @@ The correct approach is to capture the best available metadata at submission tim
 
 **If this is revisited:** A reliable implementation requires a stable shared author identifier (e.g. a ULID on OSP author records) established at submission time and stored in an `integration_author_links` table owned by the OSP integration handler. This is a non-trivial feature that should be driven by demonstrated post-launch user need, not speculative design.
 
-### 22.2 Validators as a Publication Gate, Not a Submission Gate
+### 22.2 One Validator Per Repository, Not Per Profile or Per DOI
 
-**Decision:** Validators run at both submission and approval. Errors block at both stages. Warnings surface at both but only require acknowledgement at approval.
+**Decision:** Each repository is assigned a single metadata standard validator. Validators are not configured at the profile or DOI level.
 
-**Rationale:** Running validators at submission catches errors early — the editor cannot submit a DOI with validation errors, which prevents the approver from receiving incomplete submissions. Warnings at submission are advisory, giving the editor a chance to address them without blocking their workflow. At approval, the same validators run again on the final `form_data` state. Errors still block. Warnings require explicit acknowledgement from the approver before the DOI can be published, ensuring the approver — the last line of defence before a DOI becomes findable — consciously accepts any quality gaps.
+**Rationale:** A repository maps one-to-one with a DataCite prefix, which represents a single collection type (publications, data, maps). Each collection type has one metadata standard. Attaching validators to profiles would require repeating the same standard across every profile in a repository, or introduce merge/ordering complexity if profiles could override the repository standard. Attaching validators to individual DOIs would create a governance escape hatch — the whole point of DOI Forge is that individuals cannot bypass institutional policy. Institutions that publish across different resource types should use separate repositories with separate prefixes, matching how DataCite provisions accounts.
 
-### 22.3 PostgreSQL over SQLite
+### 22.3 Three Severity Levels (Error, Warning, Info)
+
+**Decision:** Validators return results at three severity levels: error (hard block), warning (must acknowledge), and info (advisory, never blocks).
+
+**Rationale:** Two levels (error/warning) force a binary choice — either a metadata gap blocks publication or it doesn't. In practice, metadata standards have three tiers: mandatory fields, strongly recommended fields, and best-practice guidance. The `info` level captures "this would improve your metadata" without burdening the approver with acknowledgement checkboxes for every nice-to-have. Running validators at submission catches errors early — the editor cannot submit with errors. Warnings and info surface at both stages. At approval, errors block, warnings require acknowledgement, and info is shown for awareness only.
+
+### 22.4 Validators Registered via Database Seeder, Not Auto-Discovery
+
+**Decision:** Available validators are stored in a `validators` database table maintained by a seeder with stable IDs, rather than auto-discovered from the filesystem.
+
+**Rationale:** Convention-based auto-discovery (deriving slugs from class names) is fragile — renaming a class silently changes its slug, breaking every repository assignment that referenced the old slug. A database seeder with explicit stable IDs provides: rename safety (the ID and slug survive class renames), versioning (a v2 standard is a new row, coexisting with v1 during transition), and a concrete list for the admin UI dropdown. The cost is one seeder row per validator — trivial given that the total number of metadata standards in any deployment will be small (typically 2–5).
+
+### 22.5 PostgreSQL over SQLite
 
 **Decision:** PostgreSQL 18 is the database engine.
 
 **Rationale:** DOI Forge runs queue workers (Horizon) alongside web request handlers concurrently. SQLite's file-level write lock creates contention under that pattern — a background URL verification job and an autosave request will collide. PostgreSQL handles concurrent writers cleanly. It also provides proper JSON operators for querying `form_data`, full-text search if needed later, and production parity that prevents the class of bugs where SQLite's more permissive type coercion and case-insensitive `LIKE` mask issues that surface in production. Spatie Laravel Backup handles PostgreSQL dumps natively, so operational complexity is equivalent.
 
-### 22.4 No Event Sourcing
+### 22.6 No Event Sourcing
 
 **Decision:** Standard Eloquent models with Spatie Activity Log, not event sourcing.
 
 **Rationale:** The audit requirements are real but well served by Spatie Activity Log combined with DataCite's own activity log. Event sourcing was considered (Laravel Verbs) but rejected because: the domain is simple, replay is never needed independently of DataCite, externally minted DOIs have no event history creating an impedance mismatch, and the operational and contribution overhead is not justified by the benefits.
 
-### 22.5 Profiles as Data, Not Code
+### 22.7 Profiles as Data, Not Code
 
 **Decision:** Metadata profiles are database records containing DataCite-shaped JSON, not PHP classes.
 
-**Rationale:** A profile is just a seed — a standard DataCite JSON object that pre-fills the form when a new DOI is started. Storing it in the database means profiles can be created and modified via the admin UI without code changes, PRs, or deployments. The same Vue components used to compose DOI metadata can be reused to build a profile's seed data, keeping the experience consistent. Validators — which do require logic — remain as PHP classes registered in `ValidatorRegistry`; profiles reference them by slug.
+**Rationale:** A profile is just a seed — a standard DataCite JSON object that pre-fills the form when a new DOI is started. Storing it in the database means profiles can be created and modified via the admin UI without code changes, PRs, or deployments. The same Vue components used to compose DOI metadata can be reused to build a profile's seed data, keeping the experience consistent. Validators — which do require logic — remain as PHP classes registered via the `validators` database table (see §4.3.1); repositories reference them by FK.
 
-### 22.6 Spatie Laravel Data + Wayfinder Stable for Type Safety
+### 22.8 Spatie Laravel Data + Wayfinder Stable for Type Safety
 
 **Decision:** Use Spatie Laravel Data for typed Data objects with colocated validation and auto-generated TypeScript (via TypeScript Transformer). Use Wayfinder stable for typed route/action functions. The SDK (`datacite-php-sdk`) remains framework-agnostic — Data classes live in DOI Forge only.
 
 **Rationale:** The DataCite metadata shape is deeply nested. Writing validation as flat FormRequest rule arrays is verbose and error-prone for structures like `creators[].nameIdentifiers[]` and `relatedItems[].contributors[]`. Data classes provide colocated validation on each nested structure, clean controller type-hints, and auto-generated TypeScript for all page props, form payloads, and API responses — not just the DataCite shape. This eliminates manually maintained TypeScript files entirely. Wayfinder `next` was considered but rejected because as of March 2026 it remains in beta with an unstable API and known performance issues. This can be revisited when it reaches a stable release.
 
-### 22.7 form_data as Pure DataCite JSON
+### 22.9 form_data as Pure DataCite JSON
 
 **Decision:** The `form_data` column on the `dois` table contains DataCite-shaped JSON only. No internal identifiers (OSP author IDs etc.) are stored there.
 
