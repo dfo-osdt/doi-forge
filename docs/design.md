@@ -1,6 +1,6 @@
 # DOI Forge — System Design Document
 
-**Version:** 1.6 (Draft)
+**Version:** 1.7 (Draft)
 **Status:** In Progress
 **Language:** Bilingual (EN/FR)
 
@@ -94,7 +94,13 @@ DOI Forge (Laravel 13)
   ├── Audit log (Spatie Activity Log)
       |
       v
-DataCite API (via datacite-php-sdk)
+DataCiteService (Spatie Data ↔ SDK DTO boundary)
+      |
+      v
+datacite-php-sdk (framework-agnostic, Saloon)
+      |
+      v
+DataCite API
 ```
 
 External publishing systems connect via the DOI Forge API using Sanctum tokens scoped to a repository.
@@ -162,6 +168,122 @@ DOI Forge deliberately stores only what is needed for governance. It does not mi
 All tables use integer primary keys. Enumeration is not a concern — authentication and authorization prevent unauthorized access regardless of ID guessability. The DOI string itself (`10.1234/abc-xyz`) is the meaningful external identifier and is always returned in API responses.
 
 DOI browsing and detail views query the DataCite API directly via the SDK.
+
+### 3.5 DataCite Service Layer
+
+The `DataCiteService` is the single boundary between DOI Forge and the `datacite-php-sdk`. It translates between Spatie Data objects (used throughout DOI Forge) and the SDK's framework-agnostic DTOs. No other code in DOI Forge touches SDK DTOs directly.
+
+**Why a parallel set of Data classes?**
+
+The SDK ships plain PHP DTOs — framework-agnostic, no validation, no TypeScript generation. DOI Forge needs Spatie Data versions of the same DataCite shape to get colocated validation, auto-generated TypeScript, Inertia page props, and form request hydration. The two sets mirror the same DataCite JSON structure — conversion is `->toArray()` / `::from()` in each direction.
+
+| Concern | SDK DTO | Spatie Data |
+|---|---|---|
+| DataCite JSON shape | Yes | Yes (same shape) |
+| Colocated validation rules | No | `rules()` on each nested class |
+| TypeScript generation | No | Automatic via TypeScript Transformer |
+| Inertia page props | Manual | Automatic |
+| Enum casting, nested hydration | Manual | Declarative |
+| Form request hydration | No | `DoiData::from($request)` |
+
+**Directory structure:**
+
+```
+app/
+  Data/
+    Doi/
+      DoiData.php                    ← top-level, mirrors DataCite schema
+      CreatorData.php
+      NameIdentifierData.php
+      TitleData.php
+      DescriptionData.php
+      TypesData.php
+      PublisherData.php
+      RelatedItemData.php
+      AlternateIdentifierData.php
+      ...
+  Services/
+    DataCite/
+      DataCiteServiceInterface.php   ← the contract DOI Forge codes against
+      DataCiteService.php            ← the boundary (Spatie Data ↔ SDK DTO)
+```
+
+**Interface:**
+
+```php
+interface DataCiteServiceInterface
+{
+    public function for(Repository $repository): static;
+    public function createDraft(DoiData $data): DOIData;
+    public function publish(string $doi, DoiData $data): DOIData;
+    public function updateMetadata(string $doi, DoiData $data): DOIData;
+    public function deleteDraft(string $doi): void;
+    public function getDoi(string $doi): DoiData;
+}
+```
+
+**Implementation:**
+
+```php
+final class DataCiteService implements DataCiteServiceInterface
+{
+    private DataCite $client;
+
+    public function for(Repository $repository): static
+    {
+        $this->client = new DataCite(
+            repositoryId: $repository->datacite_repository_id,
+            password: $repository->datacite_password,
+        );
+
+        return $this;
+    }
+
+    public function createDraft(DoiData $data): DOIData
+    {
+        // Spatie Data → SDK DTO (outbound)
+        $input = CreateDOIInput::fromArray($data->toArray());
+
+        return $this->client->send(new CreateDOI($input))->dto();
+    }
+
+    public function getDoi(string $doi): DoiData
+    {
+        $response = $this->client->send(new GetDOI($doi))->dto();
+
+        // SDK DTO → Spatie Data (inbound)
+        return DoiData::from($response->attributes->toArray());
+    }
+}
+```
+
+**Registration — not a singleton:**
+
+```php
+// AppServiceProvider
+$this->app->bind(DataCiteServiceInterface::class, DataCiteService::class);
+```
+
+Each call resolves a fresh instance. The `for()` method configures it with a specific repository's credentials. This supports jobs and admin views that work across multiple repositories in a single process.
+
+```php
+// Usage in a controller or job
+$datacite = app(DataCiteServiceInterface::class)->for($doi->repository);
+$result = $datacite->createDraft($data);
+```
+
+**Testing:**
+
+Tests mock at the interface — no SDK, no Saloon, no fixtures needed for most tests:
+
+```php
+$this->mock(DataCiteServiceInterface::class, function ($mock) {
+    $mock->shouldReceive('for')->andReturnSelf();
+    $mock->shouldReceive('createDraft')->andReturn(DataCiteFixtures::createdDoi());
+});
+```
+
+For tests that verify the full SDK path, Saloon's `MockClient` is used with recorded fixtures (see §14.3).
 
 ---
 
@@ -610,12 +732,20 @@ Vue form_data (DataCite-shaped JSON)
     ↓ POST
 DoiData (Spatie Data — validates + hydrates)
     ↓
-$data->toArray() → CreateDOIInput::fromArray(...)
-    ↓
-DataCite SDK → DataCite API
+DataCiteService::createDraft($doiData)
+    ↓ (Spatie Data → SDK DTO internally)
+datacite-php-sdk → DataCite API
 ```
 
-No translation layer — the Data classes mirror the DataCite shape exactly, so `->toArray()` produces the same JSON the SDK expects. The `existsInDatacite()` check on `DoiState` guards every DataCite API call.
+```
+DataCite API → datacite-php-sdk
+    ↓
+DataCiteService::getDoi($doi)
+    ↓ (SDK DTO → Spatie Data internally)
+DoiData (Spatie Data — typed props for Inertia / form_data for storage)
+```
+
+The Data classes mirror the DataCite shape exactly. The `DataCiteService` is the single seam where Spatie Data meets the SDK (see §3.5). The `existsInDatacite()` check on `DoiState` guards every DataCite API call.
 
 ### 4.7 DOI Reviews
 
@@ -798,18 +928,19 @@ All significant actions are recorded via Spatie Activity Log with full attributi
 
 ### 7.1 DTO-Based Payload Logging
 
-Because `form_data` is DataCite-shaped JSON and the SDK's `CreateDOIInput` deserializes directly from it, every API call logs the exact payload sent to DataCite — not an approximation. This is a natural consequence of the architecture rather than extra instrumentation:
+Because `form_data` is DataCite-shaped JSON and the Spatie Data classes mirror the SDK's DTO shape exactly, every API call logs the exact payload sent to DataCite — not an approximation. The `DataCiteService` (§3.5) handles the conversion internally; the caller works entirely with `DoiData`:
 
 ```php
-$input = CreateDOIInput::fromArray($doi->form_data);
+$data = DoiData::from($doi->form_data);
 
 // Exact payload logged before sending
 activity()
     ->on($doi)
-    ->withProperties(['payload' => $input->toArray()])
+    ->withProperties(['payload' => $data->toArray()])
     ->log('doi.draft_requested');
 
-$response = $this->datacite->createDOI($input);
+$datacite = app(DataCiteServiceInterface::class)->for($doi->repository);
+$response = $datacite->createDraft($data);
 ```
 
 On metadata updates, a before/after diff is logged alongside the payload:
@@ -820,14 +951,14 @@ activity()
     ->withProperties([
         'before'  => $doi->getOriginal('form_data'),
         'after'   => $doi->form_data,
-        'payload' => $input->toArray(),
+        'payload' => $data->toArray(),
     ])
     ->log('doi.metadata_updated');
 ```
 
 This means the audit log answers "what exactly did we send to DataCite, and what changed from the previous version" with no additional effort.
 
-The same DTO path also enables reconciliation — a DOI created outside DOI Forge can be fetched from DataCite via the SDK, its attributes written to `form_data`, and it becomes a first-class DOI Forge record.
+The same service path enables import — a DOI fetched from DataCite via `DataCiteService::getDoi()` returns a `DoiData` instance that maps directly to `form_data` (see §17).
 
 ### 7.2 Actions Logged
 
@@ -967,7 +1098,7 @@ The SDK packages (`datacite-php-sdk`, `sierra-php-sdk`) own their own test suite
 
 ### 14.2 Test Layers
 
-**Unit tests** — domain logic in isolation. Profile defaults, state machine transitions, `DoiState` enum behaviour, `CreateDOIInput` construction from `form_data`. No database, no HTTP, very fast.
+**Unit tests** — domain logic in isolation. Profile defaults, state machine transitions, `DoiState` enum behaviour, Spatie Data object construction from `form_data`. No database, no HTTP, very fast.
 
 **Feature tests** — full HTTP tests through Laravel's test client. Session auth for web routes, Sanctum token auth for API endpoints. DataCite and Sierra API calls are intercepted via mocked service interfaces. These form the bulk of the test suite.
 
@@ -981,14 +1112,15 @@ Saloon is a dependency of the SDKs. DOI Forge adds it as a dev dependency to acc
 composer require saloonphp/saloon --dev
 ```
 
-The `DataCiteService` wrapper is the boundary between DOI Forge and the SDK. Tests mock at this boundary for most cases:
+The `DataCiteService` is the boundary between DOI Forge and the SDK (see §3.5). Tests mock at this boundary for most cases:
 
 ```php
 // Fast — no Saloon, no fixtures needed
 $this->mock(DataCiteServiceInterface::class, function ($mock) {
+    $mock->shouldReceive('for')->andReturnSelf();
     $mock->shouldReceive('createDraft')
          ->once()
-         ->with(Mockery::type(CreateDOIInput::class))
+         ->with(Mockery::type(DoiData::class))
          ->andReturn(DataCiteFixtures::createdDoi());
 });
 ```
@@ -1407,18 +1539,19 @@ When an institution adopts DOI Forge, existing DOIs under their DataCite prefix 
 
 ### 17.1 Import Model
 
-The architecture supports import naturally because `form_data` is pure DataCite JSON (§23.9). The SDK fetches a DOI from DataCite and the response maps directly to `form_data` — no translation layer.
+The architecture supports import naturally because `form_data` is pure DataCite JSON (§23.9) and the `DataCiteService` (§3.5) handles conversion in both directions. The service fetches a DOI from DataCite, returns a `DoiData` instance, and its `toArray()` output maps directly to `form_data`.
 
 ```php
-$dataciteRecord = $sdk->getDoi('10.1234/existing-doi');
+$datacite = app(DataCiteServiceInterface::class)->for($repository);
+$data = $datacite->getDoi('10.1234/existing-doi');
 
 $doi = Doi::create([
     'repository_id' => $repository->id,
-    'form_data'     => $dataciteRecord->attributes->toArray(),
-    'doi'           => $dataciteRecord->doi,
-    'state'         => DoiState::from($dataciteRecord->attributes->state),
+    'form_data'     => $data->toArray(),
+    'doi'           => '10.1234/existing-doi',
+    'state'         => DoiState::Published, // mapped from DataCite state
     'submitted_by'  => $importingAdmin->id,
-    'published_at'  => $dataciteRecord->attributes->registered,
+    'published_at'  => now(), // or preserved from DataCite registered date
 ]);
 
 activity()
