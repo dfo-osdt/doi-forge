@@ -1,0 +1,17 @@
+<?php
+
+namespace App\Data\Doi;
+
+use Spatie\LaravelData\Attributes\Validation\Max;
+use Spatie\LaravelData\Attributes\Validation\Required;
+use Spatie\LaravelData\Data;
+
+class IdentifierData extends Data
+{
+    public function __construct(
+        #[Required]
+        public string $identifier,
+        #[Required, Max(255)]
+        public string $identifierType,
+    ) {}
+}
