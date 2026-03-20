@@ -72,7 +72,7 @@ Dedicated repository platforms (Dataverse, DSpace, Zenodo etc.) solve this probl
 | DataCite SDK                | `vincentauger/datacite-php-sdk` (built on Saloon)             |
 | Sierra SDK                  | `vincentauger/sierra-php-sdk` (built on Saloon, optional)     |
 | Frontend code quality       | @antfu/eslint-config (linting + formatting)                   |
-| Backend code quality        | Larastan (PHPStan level 8), Rector, Laravel Pint              |
+| Backend code quality        | Larastan (PHPStan level 5), Rector, Laravel Pint              |
 | Testing                     | Pest PHP                                                      |
 | CI/CD                       | GitHub Actions with self-hosted runner                        |
 | Deployment                  | Docker Compose (self-hosted, on-prem VM)                      |
@@ -148,7 +148,8 @@ DOI Forge deliberately stores only what is needed for governance. It does not mi
 | Table                                   | Purpose                                                                                                     |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `repositories`                          | DataCite repository config, encrypted credentials, validator assignment                                     |
-| `profiles`                              | Metadata profiles — seed data (DoiData DTO), per repository                                                 |
+| `profiles`                              | Metadata profiles — seed data (DoiData DTO), per repository (soft-deleted)                                  |
+| `doi_reviews`                           | Review history — decisions, notes, validator snapshots, acknowledged warnings                                |
 | `validators`                            | Seeded registry of available metadata standard validators (stable IDs, slugs, class references)             |
 | `dois`                                  | Full DOI lifecycle from composing through publication — DataCite-shaped `form_data` autosaved incrementally |
 | `users`                                 | Local user records, created on first Entra login                                                            |
@@ -332,6 +333,8 @@ $table->string('slug')->unique();      // e.g. 'dfo-publications'
 $table->string('class');                // e.g. App\Validators\DfoPublicationsMetadataStandard::class
 $table->string('name_en');              // human-readable name
 $table->string('name_fr');
+$table->string('description_en');       // one-line summary of what this standard enforces
+$table->string('description_fr');
 $table->timestamps();
 ```
 
@@ -346,6 +349,8 @@ Validator::upsert([
         'class' => DfoPublicationsMetadataStandard::class,
         'name_en' => 'DFO Publications Metadata Standard',
         'name_fr' => 'Norme de métadonnées des publications du MPO',
+        'description_en' => 'Enforces DFO publication requirements: bilingual titles, abstracts, series information, and ISSN.',
+        'description_fr' => 'Applique les exigences de publication du MPO : titres bilingues, résumés, information de série et ISSN.',
     ],
     [
         'id' => 2,
@@ -353,6 +358,8 @@ Validator::upsert([
         'class' => DfoDataMetadataStandard::class,
         'name_en' => 'DFO Data Metadata Standard',
         'name_fr' => 'Norme de métadonnées des données du MPO',
+        'description_en' => 'Enforces DFO data requirements: spatial coverage, temporal extent, and subject vocabulary.',
+        'description_fr' => 'Applique les exigences de données du MPO : couverture spatiale, étendue temporelle et vocabulaire de sujets.',
     ],
     [
         'id' => 3,
@@ -360,8 +367,10 @@ Validator::upsert([
         'class' => DataciteMinimumStandard::class,
         'name_en' => 'DataCite Minimum Standard',
         'name_fr' => 'Norme minimale DataCite',
+        'description_en' => 'Enforces DataCite required and recommended properties only.',
+        'description_fr' => 'Applique uniquement les propriétés requises et recommandées de DataCite.',
     ],
-], ['id'], ['slug', 'class', 'name_en', 'name_fr']);
+], ['id'], ['slug', 'class', 'name_en', 'name_fr', 'description_en', 'description_fr']);
 ```
 
 Adding a new validator is: create the PHP class, add a row to the seeder, run the seeder. Renaming a class is a seeder update — the stable ID and slug are unchanged, so repository assignments are unaffected. Versioning is also straightforward — `dfo-publications-v2` is a new row; the admin swaps the repository's `validator_id` when ready.
@@ -448,22 +457,7 @@ The approval view shows a validator results panel. Errors are listed with a clea
 
 **Activity log:**
 
-Acknowledged warnings are recorded in the activity log at approval time. The `properties` payload includes the full list of acknowledged `ValidationResult` objects — validator class name, field, and message — so the audit trail captures exactly which gaps the approver knowingly accepted:
-
-```php
-activity()
-    ->on($doi)
-    ->withProperties([
-        'acknowledged_warnings' => collect($warnings)
-            ->map(fn (ValidationResult $r) => [
-                'validator' => $r->validator, // class name
-                'field'     => $r->field,
-                'message'   => $r->message,
-            ])
-            ->all(),
-    ])
-    ->log('doi.approved_with_warnings');
-```
+Validator results and acknowledged warnings are captured in two places: the `doi_reviews` table (structured, queryable) and the Spatie activity log (unified audit trail). The `doi_review` record stores the full `validator_results` snapshot and `acknowledged_warnings` at the time of the decision. The activity log entry references the review ID for cross-referencing (see §4.7).
 
 ### 4.4 User
 
@@ -481,14 +475,14 @@ A DOI record tracks the full lifecycle from initial form composition through pub
 - `doi` — null until DataCite confirms draft creation
 - `state` — `DoiState` enum cast: `composing | draft | pending_approval | published | rejected | withdrawn`
 - `submitted_by` — FK to users (resolved from email for API submissions)
-- `approved_by` — FK to users, nullable, shown in UI
-- `approved_at` — timestamp, nullable, shown in UI
+- `external_reference` — string, nullable, unique per repository. Provided by external systems via the API to enable idempotent draft creation and traceability back to the source system (e.g. `osp_pub_id_1234`)
 - `published_at` — timestamp, nullable, set on first publication (used to detect re-approval vs first approval)
-- `approver_notes` — text, nullable, shown in UI for both approval comments and rejection reasons
-- `url_verified` — boolean, set by background URL verification job
-- `url_verified_at` — timestamp, nullable
-- `url_verification_error` — nullable, populated if verification fails
+- `url_resolves` — boolean, set by background URL verification job
+- `url_resolves_checked_at` — timestamp, nullable
+- `url_resolves_error` — nullable, populated if verification fails
 - `last_autosaved_at` — timestamp, shown in form UI ("Last saved X ago")
+
+Approval history (who approved, when, with what notes) is tracked in the `doi_reviews` table (see §4.7), not inline on the DOI record.
 
 ### 4.6 DOI State Machine & Autosave
 
@@ -503,7 +497,7 @@ DOI Forge maintains its own application state machine that maps onto — but is 
 | `pending_approval` | `draft` or `findable` | Internal governance state — DataCite state unchanged while awaiting approval |
 | `published`        | `findable`          | We triggered the transition                                     |
 | `rejected`         | `draft` or `findable` | Returned to editor for corrections, resubmittable — DataCite state unchanged |
-| `withdrawn`        | none                | Cancelled — DataCite draft deleted, record soft-deleted locally |
+| `withdrawn`        | none                | User-initiated cancellation of an unpublished DOI — DataCite draft deleted, record soft-deleted locally |
 
 `pending_approval` is purely internal. When a new DOI is submitted for first publication, DataCite remains `draft`. When a published DOI is edited and resubmitted, DataCite remains `findable` with the previous metadata — DOI Forge holds the pending changes in `form_data` and only pushes to DataCite on approval. The approval handler always issues a metadata update; for first publication this includes the `event: "publish"` flag to transition DataCite from `draft` to `findable`.
 
@@ -527,18 +521,19 @@ enum DoiState: string
         };
     }
 
-    /** Whether the DOI has ever been published (findable) in DataCite. */
-    public function isReapproval(Doi $doi): bool
+    public function isEditable(): bool
     {
-        return $doi->published_at !== null;
+        return in_array($this, [self::Composing, self::Draft, self::Rejected]);
     }
 
-    public function isEditable(): bool
+    public function canWithdraw(): bool
     {
         return in_array($this, [self::Composing, self::Draft, self::Rejected]);
     }
 }
 ```
+
+Re-approval detection (`$doi->published_at !== null`) lives on the `Doi` model, not the enum — it queries the record, not the state value.
 
 **State machine:**
 
@@ -548,7 +543,9 @@ enum DoiState: string
         v
     composing  ←──────────────────────── [Rejected: back with notes]
     (autosaved)                                        ↑
-        |                                              |
+        |  \                                           |
+        |  [Withdraw] → withdrawn                      |
+        |               (soft-deleted)                 |
  [Create Draft]                                        |
         |                                              |
         v                                              |
@@ -558,35 +555,35 @@ enum DoiState: string
       draft ──── [Submit for approval]                 |
       (editable,        |                              |
        autosaved)       v                              |
-               VerifyUrlJob (queued)                   |
-               /              \                        |
-         [URL ok]         [URL fails]                  |
-              |                |                       |
-              v                v                       |
-      pending_approval    url_invalid                  |
-      (form locked,      (notifies editor              |
-       approver inbox)    to fix URL)                  |
-           |    \                                      |
-     [Approve]  [Reject] ─────────────────────────────┘
-           |
-    validators run
-    (errors block,
-     warnings require
-     acknowledgement)
-           |
-           v
-     published  ──── [Edit published DOI] ───┐
-  (DataCite: findable)                       |
-       ↑                                     v
-       |                              pending_approval
-       |                              (DataCite stays findable,
-       |                               form_data holds changes)
-       |                                   /    \
-       |                            [Approve]  [Reject] → editor fixes
-       |                                 |            and resubmits
-       |                          validators run
-       └──────────── (pass) ──────(update metadata
-                                   in DataCite)
+        |       VerifyUrlJob (queued)                   |
+        |       sets url_resolves flag                  |
+        |       (advisory, not a state)                 |
+   [Withdraw]          |                               |
+        |              v                               |
+        v       pending_approval                       |
+    withdrawn   (form locked,                          |
+  (DataCite     review created)                        |
+   draft             |    \                            |
+   deleted)    [Approve]  [Reject] ────────────────────┘
+                     |
+              validators run
+              (errors block,
+               warnings require
+               acknowledgement)
+                     |
+                     v
+               published  ──── [Edit published DOI] ───┐
+            (DataCite: findable)                       |
+                 ↑                                     v
+                 |                              pending_approval
+                 |                              (DataCite stays findable,
+                 |                               form_data holds changes)
+                 |                                   /    \
+                 |                            [Approve]  [Reject] → editor fixes
+                 |                                 |            and resubmits
+                 |                          validators run
+                 └──────────── (pass) ──────(update metadata
+                                             in DataCite)
 ```
 
 **States:**
@@ -596,9 +593,9 @@ enum DoiState: string
 - `pending_approval` — awaiting human review, form locked. DataCite state is unchanged (remains `draft` for new DOIs, `findable` for published DOIs being edited)
 - `published` — DOI is findable in DataCite, permanent, cannot be deleted. Can be edited, which triggers re-approval
 - `rejected` — returned to editor with notes, expected to be corrected and resubmitted. DataCite state unchanged
-- `withdrawn` — deliberately cancelled by editor or admin. DataCite draft deleted if it existed. Record soft-deleted locally but retained for audit. Distinct from `rejected` — a withdrawn DOI is not expected to be resubmitted
+- `withdrawn` — user-initiated cancellation of an unpublished DOI (composing, draft, or rejected). DataCite draft deleted if it existed. Record soft-deleted locally but retained for audit. Only applies to DOIs that have never been published — a published DOI cannot be withdrawn. Distinct from `rejected` — withdrawn is the editor choosing to abandon, rejected is the approver sending it back
 
-**URL verification** runs as a queued job when a DOI is submitted for approval. If the target URL returns a non-2xx response the state transitions to `url_invalid` and the editor is notified. Because some institutional URLs sit behind auth or VPN, an approver can override the URL check and approve regardless — the verification result is advisory, not a hard block.
+**URL verification** runs as a queued job when a DOI is submitted for approval. The result is stored as a flag (`url_resolves`, `url_resolves_checked_at`, `url_resolves_error`) on the DOI record — it is not a state transition. If the target URL returns a non-2xx response, the editor is notified. Because some institutional URLs sit behind auth or VPN, an approver can override the URL check and approve regardless — the verification result is advisory, not a hard block.
 
 **Autosave:** The Vue form debounces a PATCH to `dois/{id}/autosave` two seconds after the last change. No validation runs on autosave — only on explicit "Create Draft" or "Submit for Approval" actions. The form can be closed and resumed at any point.
 
@@ -615,6 +612,71 @@ DataCite SDK → DataCite API
 ```
 
 No translation layer — the Data classes mirror the DataCite shape exactly, so `->toArray()` produces the same JSON the SDK expects. The `existsInDatacite()` check on `DoiState` guards every DataCite API call.
+
+### 4.7 DOI Reviews
+
+Review history is tracked in a dedicated `doi_reviews` table rather than inline fields on the DOI record. This preserves the full approval history across multiple submission rounds and provides a natural extension point for multi-step approval workflows.
+
+**Schema:**
+
+```php
+$table->id();
+$table->foreignId('doi_id')->constrained('dois')->cascadeOnDelete();
+$table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete(); // assigned reviewer
+$table->string('role');                    // reviewer's role in this review: 'approver' (v1), future: 'recommender', 'section_lead'
+$table->string('decision')->nullable();    // approved | rejected — null while pending
+$table->text('notes')->nullable();         // reviewer's note to editor (rejection reason, approval comment)
+$table->json('validator_results')->nullable(); // snapshot of validation results at review time
+$table->json('acknowledged_warnings')->nullable(); // warnings the reviewer explicitly accepted
+$table->timestamp('completed_at')->nullable(); // null = pending, set when decided
+$table->timestamps();
+```
+
+**Reviewer roles:**
+
+The `role` column identifies *what capacity* the reviewer is acting in for this specific review. In v1, the only role is `approver`. The column exists to support future multi-step workflows (e.g. `recommender` → `approver`, or `section_lead` → `approver`) without a schema migration. Queries like "show me all reviews where an approver (not a recommender) approved" work cleanly from day one.
+
+**Status is derived, not stored:**
+
+- **Pending:** `completed_at IS NULL` and `decision IS NULL`
+- **Completed:** both `decision` and `completed_at` are set
+
+The latest review where `completed_at IS NULL` is the active pending review. Completed reviews are immutable history.
+
+**Ordering:**
+
+Reviews are ordered by `created_at`. Within a single submission round, there is one pending review at a time (v1). In a future multi-step workflow, multiple reviews could be created in sequence — each with a different `role` — and processed in `created_at` order. The DOI only advances to `published` when all required review steps are completed.
+
+**Flow (v1 — single approver):**
+
+1. Editor submits DOI for approval → a `doi_review` row is created with `role: 'approver'`, `decision: null`, `completed_at: null`
+2. Approver acts → `decision` is set (`approved` or `rejected`), `completed_at` is set, `validator_results` captures the validation snapshot
+3. If rejected: editor fixes and resubmits → a new `doi_review` row is created
+4. If approved with warnings: `acknowledged_warnings` records exactly which gaps the approver knowingly accepted
+
+**Flow (future — multi-step):**
+
+1. Editor submits → `doi_review` created with `role: 'recommender'`
+2. Recommender approves → `doi_review` created with `role: 'approver'`
+3. Approver approves → DOI advances to `published`
+
+The full review chain is preserved — if a DOI goes through three rounds of reject-fix-resubmit before approval, all reviews and their notes are in the audit trail.
+
+**Activity log integration:**
+
+Each review completion is also recorded in the Spatie activity log for the unified audit trail:
+
+```php
+activity()
+    ->on($doi)
+    ->withProperties([
+        'review_id' => $review->id,
+        'role'      => $review->role,
+        'decision'  => $review->decision,
+        'acknowledged_warnings' => $review->acknowledged_warnings,
+    ])
+    ->log("doi.review.{$review->decision}");
+```
 
 ---
 
@@ -676,12 +738,15 @@ $token = $user->createToken(
 POST /api/v1/repositories/{repository}/dois/draft
 ```
 
+API-created DOIs skip the `composing` state entirely — the calling system already has a complete metadata payload, so there is no interactive form-filling phase. The DOI goes directly to DataCite as a `draft`.
+
 **Request:**
 
 ```json
 {
   "profile_id": 3,
   "submitted_by": "john.doe@dfo-mpo.gc.ca",
+  "external_reference": "osp_pub_id_1234",
   "metadata": {
     "titles": [
       { "title": "My Report Title", "lang": "en" },
@@ -693,7 +758,14 @@ POST /api/v1/repositories/{repository}/dois/draft
 }
 ```
 
-The `metadata` field is optional and follows the DataCite JSON shape. When provided, it is **merged on top of the profile's seed data** — request values take precedence over profile defaults. This lets calling systems pre-fill fields specific to a publication while inheriting the profile's standard values (publisher, resource type, series info, etc.).
+**Fields:**
+
+- `profile_id` — required. Which profile's seed data to use as the base.
+- `submitted_by` — required. Email of the person who authored the submission. Must match an allowed email domain configured per deployment (e.g. `@dfo-mpo.gc.ca`, `@ec.gc.ca`). The email is resolved to an existing user record — if no user exists with that email, the request is rejected. This ensures attribution integrity without creating shadow user records.
+- `external_reference` — optional. A caller-supplied identifier for idempotent draft creation. Unique per repository — if a second request arrives with the same `external_reference`, the existing DOI is returned instead of creating a duplicate. Also provides audit traceability back to the source system.
+- `metadata` — optional. DataCite JSON shape, merged on top of the profile's seed data.
+
+The `metadata` field follows the DataCite JSON shape. When provided, it is **merged on top of the profile's seed data** — request values take precedence over profile defaults. This lets calling systems pre-fill fields specific to a publication while inheriting the profile's standard values (publisher, resource type, series info, etc.).
 
 ```php
 $formData = array_replace_recursive($profile->data, $request->metadata ?? []);
@@ -705,9 +777,12 @@ $formData = array_replace_recursive($profile->data, $request->metadata ?? []);
 {
   "doi": "10.1234/abc-xyz",
   "state": "draft",
+  "external_reference": "osp_pub_id_1234",
   "id": 42
 }
 ```
+
+If `external_reference` was provided and already exists for this repository, the response returns the existing record with a `200` instead of `201`.
 
 The response includes the DOI Forge record `id` so the calling system can reference it if needed. Publication in DataCite (draft → findable) always requires a human approval step in the DOI Forge web UI.
 
@@ -760,7 +835,7 @@ The same DTO path also enables reconciliation — a DOI created outside DOI Forg
 - Draft DOI confirmed — with DataCite response (DOI assigned)
 - DOI metadata updated — with before/after diff and payload
 - DOI submitted for approval
-- DOI approved / rejected (with notes)
+- DOI review completed — approved or rejected (with notes, validator snapshot, acknowledged warnings)
 - DOI published — with DataCite response
 - Draft DOI deleted
 - DataCite API failure — action attempted, error and payload recorded
@@ -811,7 +886,7 @@ A scheduled job runs daily against all published DOIs, checking that the target 
 Schedule::command('dois:monitor-urls')->daily()->at('04:00');
 ```
 
-The job updates `url_verified`, `url_verified_at`, and `url_verification_error` on each record. If a URL fails the check a notification is sent to the repository admin.
+The job updates `url_resolves`, `url_resolves_checked_at`, and `url_resolves_error` on each record. If a URL fails the check a notification is sent to the repository admin.
 
 ### 10.2 Failure Escalation
 
@@ -1184,7 +1259,8 @@ final class SierraIntegration extends BaseIntegration
 
         Doi::where('repository_id', $integration->repository_id)
             ->where('state', DoiState::Published)
-            ->each(function (Doi $doi) use ($sierra, $integration) {
+            ->chunkById(100, function ($dois) use ($sierra, $integration) {
+              $dois->each(function (Doi $doi) use ($sierra, $integration) {
                 $results = $sierra->send(
                     new GetSearchBib('https://doi.org/' . $doi->doi)
                 );
@@ -1206,6 +1282,7 @@ final class SierraIntegration extends BaseIntegration
                         'diff'           => $diff,
                     ]);
                 }
+              });
             });
 
         $integration->update(['last_synced_at' => now()]);
@@ -1222,6 +1299,8 @@ Conflicts are surfaced in the DOI Forge UI as a per-repository inbox. A user wit
 - **Ignore** — dismiss without resolution
 
 All resolutions are recorded in the activity log with full attribution. Automated conflict resolution is intentionally not supported — published DOIs should not be silently overwritten.
+
+Conflicts are deduplicated on `(doi_id, integration_id)` — only one pending conflict can exist per DOI per integration. If a sync run detects a diff for a DOI that already has an unresolved conflict, the existing conflict is updated rather than creating a duplicate.
 
 ### 16.5 Scheduling
 
@@ -1275,6 +1354,7 @@ A `CONTRIBUTING.md` and a seed command for example profiles will be provided. A 
 - ORCID integration for creator identity
 - OSP (Open Science Portal) integration handler — architecture supports it via `repository_integrations` but not built in v1
 - CSAS publication profiles — will be added as additional profile classes post-MVP
+- Metadata completeness scoring / dashboard — natural follow-on from validator architecture, deferred to v2
 
 ---
 
@@ -1318,6 +1398,8 @@ erDiagram
     string class
     string name_en
     string name_fr
+    string description_en
+    string description_fr
   }
   profiles {
     int id PK
@@ -1326,24 +1408,34 @@ erDiagram
     string name_fr
     json data
     bool active
+    timestamp deleted_at
   }
   dois {
     int id PK
     int repository_id FK
     int profile_id FK
     int submitted_by FK
-    int approved_by FK
     string doi
     string state
     json form_data
-    timestamp approved_at
+    string external_reference
     timestamp published_at
-    text approver_notes
-    bool url_verified
-    timestamp url_verified_at
-    string url_verification_error
+    bool url_resolves
+    timestamp url_resolves_checked_at
+    string url_resolves_error
     timestamp last_autosaved_at
     timestamp deleted_at
+  }
+  doi_reviews {
+    int id PK
+    int doi_id FK
+    int user_id FK
+    string role
+    string decision
+    text notes
+    json validator_results
+    json acknowledged_warnings
+    timestamp completed_at
   }
   repository_integrations {
     int id PK
@@ -1403,6 +1495,8 @@ erDiagram
   repositories ||--o{ dois : "has"
   repositories ||--o{ repository_integrations : "has"
   profiles ||--o{ dois : "uses"
+  dois ||--o{ doi_reviews : "reviewed-by"
+  users ||--o{ doi_reviews : "reviews"
   users ||--o{ dois : "submits"
   users ||--o{ model_has_roles : "assigned"
   roles ||--o{ model_has_roles : "defines"
