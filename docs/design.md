@@ -204,28 +204,13 @@ app/
       ...
   Services/
     DataCite/
-      DataCiteServiceInterface.php   ← the contract DOI Forge codes against
       DataCiteService.php            ← the boundary (Spatie Data ↔ SDK DTO)
 ```
 
-**Interface:**
+**Service:**
 
 ```php
-interface DataCiteServiceInterface
-{
-    public function for(Repository $repository): static;
-    public function createDraft(DoiData $data): DOIData;
-    public function publish(string $doi, DoiData $data): DOIData;
-    public function updateMetadata(string $doi, DoiData $data): DOIData;
-    public function deleteDraft(string $doi): void;
-    public function getDoi(string $doi): DoiData;
-}
-```
-
-**Implementation:**
-
-```php
-final class DataCiteService implements DataCiteServiceInterface
+final class DataCiteService
 {
     private DataCite $client;
 
@@ -257,27 +242,22 @@ final class DataCiteService implements DataCiteServiceInterface
 }
 ```
 
-**Registration — not a singleton:**
-
-```php
-// AppServiceProvider
-$this->app->bind(DataCiteServiceInterface::class, DataCiteService::class);
-```
+**Not a singleton:**
 
 Each call resolves a fresh instance. The `for()` method configures it with a specific repository's credentials. This supports jobs and admin views that work across multiple repositories in a single process.
 
 ```php
 // Usage in a controller or job
-$datacite = app(DataCiteServiceInterface::class)->for($doi->repository);
+$datacite = app(DataCiteService::class)->for($doi->repository);
 $result = $datacite->createDraft($data);
 ```
 
 **Testing:**
 
-Tests mock at the interface — no SDK, no Saloon, no fixtures needed for most tests:
+Tests mock the concrete class directly — no interface needed, Laravel's container handles it:
 
 ```php
-$this->mock(DataCiteServiceInterface::class, function ($mock) {
+$this->mock(DataCiteService::class, function ($mock) {
     $mock->shouldReceive('for')->andReturnSelf();
     $mock->shouldReceive('createDraft')->andReturn(DataCiteFixtures::createdDoi());
 });
@@ -939,7 +919,7 @@ activity()
     ->withProperties(['payload' => $data->toArray()])
     ->log('doi.draft_requested');
 
-$datacite = app(DataCiteServiceInterface::class)->for($doi->repository);
+$datacite = app(DataCiteService::class)->for($doi->repository);
 $response = $datacite->createDraft($data);
 ```
 
@@ -1116,7 +1096,7 @@ The `DataCiteService` is the boundary between DOI Forge and the SDK (see §3.5).
 
 ```php
 // Fast — no Saloon, no fixtures needed
-$this->mock(DataCiteServiceInterface::class, function ($mock) {
+$this->mock(DataCiteService::class, function ($mock) {
     $mock->shouldReceive('for')->andReturnSelf();
     $mock->shouldReceive('createDraft')
          ->once()
@@ -1542,7 +1522,7 @@ When an institution adopts DOI Forge, existing DOIs under their DataCite prefix 
 The architecture supports import naturally because `form_data` is pure DataCite JSON (§23.9) and the `DataCiteService` (§3.5) handles conversion in both directions. The service fetches a DOI from DataCite, returns a `DoiData` instance, and its `toArray()` output maps directly to `form_data`.
 
 ```php
-$datacite = app(DataCiteServiceInterface::class)->for($repository);
+$datacite = app(DataCiteService::class)->for($repository);
 $data = $datacite->getDoi('10.1234/existing-doi');
 
 $doi = Doi::create([
