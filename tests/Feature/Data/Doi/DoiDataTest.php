@@ -71,13 +71,10 @@ it('optional fields default correctly when not provided', function (): void {
     expect($data->prefix)->toBeInstanceOf(Optional::class)
         ->and($data->language)->toBeInstanceOf(Optional::class)
         ->and($data->version)->toBeInstanceOf(Optional::class)
-        ->and($data->contentUrl)->toBeInstanceOf(Optional::class)
-        ->and($data->schemaVersion)->toBeInstanceOf(Optional::class)
-        ->and($data->container)->toBeInstanceOf(Optional::class);
+        ->and($data->contentUrl)->toBeInstanceOf(Optional::class);
 
     // Array optional fields default to empty arrays
-    expect($data->identifiers)->toBe([])
-        ->and($data->alternateIdentifiers)->toBe([])
+    expect($data->alternateIdentifiers)->toBe([])
         ->and($data->subjects)->toBe([])
         ->and($data->contributors)->toBe([])
         ->and($data->dates)->toBe([])

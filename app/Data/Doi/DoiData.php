@@ -15,10 +15,8 @@ use VincentAuger\DataCiteSdk\Data\CreateDOIInput;
 use VincentAuger\DataCiteSdk\Data\DOIData as SdkDOIData;
 use VincentAuger\DataCiteSdk\Data\GeoLocation\GeoLocation;
 use VincentAuger\DataCiteSdk\Data\Identifiers\AlternateIdentifier;
-use VincentAuger\DataCiteSdk\Data\Identifiers\Identifier;
 use VincentAuger\DataCiteSdk\Data\Identifiers\RelatedIdentifier;
 use VincentAuger\DataCiteSdk\Data\Identifiers\RelatedItem;
-use VincentAuger\DataCiteSdk\Data\Metadata\ContainerData as SdkContainerData;
 use VincentAuger\DataCiteSdk\Data\Metadata\Contributor;
 use VincentAuger\DataCiteSdk\Data\Metadata\Creator;
 use VincentAuger\DataCiteSdk\Data\Metadata\Date;
@@ -36,7 +34,6 @@ class DoiData extends Data
     /**
      * @param  CreatorData[]  $creators
      * @param  TitleData[]  $titles
-     * @param  IdentifierData[]  $identifiers
      * @param  AlternateIdentifierData[]  $alternateIdentifiers
      * @param  SubjectData[]  $subjects
      * @param  ContributorData[]  $contributors
@@ -65,11 +62,8 @@ class DoiData extends Data
         public string $url,
         #[Max(255)]
         public string|Optional $prefix = new Optional,
-        #[DataCollectionOf(IdentifierData::class)]
-        public array $identifiers = [],
         #[DataCollectionOf(AlternateIdentifierData::class)]
         public array $alternateIdentifiers = [],
-        public ContainerData|Optional $container = new Optional,
         #[DataCollectionOf(SubjectData::class)]
         public array $subjects = [],
         #[DataCollectionOf(ContributorData::class)]
@@ -96,8 +90,6 @@ class DoiData extends Data
         public array $fundingReferences = [],
         #[Url, Max(2048)]
         public string|Optional $contentUrl = new Optional,
-        #[Max(255)]
-        public string|Optional $schemaVersion = new Optional,
     ) {}
 
     public static function fromSdk(SdkDOIData $doi): static
@@ -118,9 +110,7 @@ class DoiData extends Data
             publisher: is_array($attrs['publisher']) ? SdkPublisherData::fromArray($attrs['publisher']) : (string) $attrs['publisher'],
             types: ResourceType::fromArray($attrs['types']),
             url: (string) $attrs['url'],
-            identifiers: array_map(Identifier::fromArray(...), $attrs['identifiers']),
             alternateIdentifiers: array_map(AlternateIdentifier::fromArray(...), $attrs['alternateIdentifiers']),
-            container: isset($attrs['container']) ? SdkContainerData::fromArray($attrs['container']) : null,
             subjects: array_map(Subject::fromArray(...), $attrs['subjects']),
             contributors: array_values(array_filter(array_map(Contributor::fromArray(...), $attrs['contributors']))),
             dates: array_map(Date::fromArray(...), $attrs['dates']),
@@ -135,7 +125,6 @@ class DoiData extends Data
             geoLocations: array_map(GeoLocation::fromArray(...), $attrs['geoLocations']),
             fundingReferences: array_map(FundingReference::fromArray(...), $attrs['fundingReferences']),
             contentUrl: $attrs['contentUrl'] ?? null,
-            schemaVersion: $attrs['schemaVersion'] ?? null,
         );
     }
 
@@ -152,9 +141,7 @@ class DoiData extends Data
             publisher: is_array($attrs['publisher']) ? SdkPublisherData::fromArray($attrs['publisher']) : (string) $attrs['publisher'],
             types: ResourceType::fromArray($attrs['types']),
             url: $attrs['url'],
-            identifiers: array_map(Identifier::fromArray(...), $attrs['identifiers']),
             alternateIdentifiers: array_map(AlternateIdentifier::fromArray(...), $attrs['alternateIdentifiers']),
-            container: isset($attrs['container']) ? SdkContainerData::fromArray($attrs['container']) : null,
             subjects: array_map(Subject::fromArray(...), $attrs['subjects']),
             contributors: array_values(array_filter(array_map(Contributor::fromArray(...), $attrs['contributors']))),
             dates: array_map(Date::fromArray(...), $attrs['dates']),
@@ -169,7 +156,6 @@ class DoiData extends Data
             geoLocations: array_map(GeoLocation::fromArray(...), $attrs['geoLocations']),
             fundingReferences: array_map(FundingReference::fromArray(...), $attrs['fundingReferences']),
             contentUrl: $attrs['contentUrl'] ?? null,
-            schemaVersion: $attrs['schemaVersion'] ?? null,
         );
     }
 }
