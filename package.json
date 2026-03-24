@@ -13,11 +13,11 @@
     "@fontsource/dm-serif-display": "^5.2.8",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@inertiajs/vue3": "^2.3.18",
-    "@vueuse/core": "^12.8.2",
+    "@vueuse/core": "^14.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "laravel-vite-plugin": "^2.1.0",
-    "lucide-vue-next": "^0.468.0",
+    "laravel-vite-plugin": "^3.0.0",
+    "lucide-vue-next": "^1.0.0",
     "reka-ui": "^2.9.2",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
@@ -27,8 +27,8 @@
     "vue-input-otp": "^0.3.2"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "4.9.5",
-    "@rollup/rollup-win32-x64-msvc": "4.9.5",
+    "@rollup/rollup-linux-x64-gnu": "^4.60.0",
+    "@rollup/rollup-win32-x64-msvc": "^4.60.0",
     "@tailwindcss/oxide-linux-x64-gnu": "^4.2.2",
     "@tailwindcss/oxide-win32-x64-msvc": "^4.2.2",
     "lightningcss-linux-x64-gnu": "^1.32.0",
@@ -41,15 +41,15 @@
     "@intlify/unplugin-vue-i18n": "^11.0.7",
     "@laravel/vite-plugin-wayfinder": "^0.1.7",
     "@tailwindcss/vite": "^4.2.2",
-    "@types/node": "^22.19.15",
+    "@types/node": "^25.5.0",
     "@vitejs/plugin-vue": "^6.0.5",
     "concurrently": "^9.2.1",
-    "eslint": "^9.39.4",
+    "eslint": "^10.1.0",
     "eslint-plugin-format": "^2.0.1",
     "lefthook": "^2.1.4",
-    "typescript": "^5.9.3",
-    "vite": "^7.3.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.2",
     "vite-plugin-vue-devtools": "^8.1.1",
-    "vue-tsc": "^2.2.12"
+    "vue-tsc": "^3.2.6"
   }
 }
