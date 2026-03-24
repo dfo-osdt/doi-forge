@@ -103,13 +103,13 @@ class DoiData extends Data
 
         return new CreateDOIInput(
             prefix: $prefix,
-            event: $event,
             creators: array_values(array_filter(array_map(Creator::fromArray(...), $attrs['creators']))),
             titles: array_map(Title::fromArray(...), $attrs['titles']),
             publicationYear: (int) $attrs['publicationYear'],
             publisher: is_array($attrs['publisher']) ? SdkPublisherData::fromArray($attrs['publisher']) : (string) $attrs['publisher'],
             types: ResourceType::fromArray($attrs['types']),
             url: (string) $attrs['url'],
+            event: $event,
             alternateIdentifiers: array_map(AlternateIdentifier::fromArray(...), $attrs['alternateIdentifiers']),
             subjects: array_map(Subject::fromArray(...), $attrs['subjects']),
             contributors: array_values(array_filter(array_map(Contributor::fromArray(...), $attrs['contributors']))),
@@ -134,13 +134,13 @@ class DoiData extends Data
 
         return new UpdateDOIInput(
             prefix: $attrs['prefix'] ?? null,
-            event: $event,
             creators: array_values(array_filter(array_map(Creator::fromArray(...), $attrs['creators']))),
             titles: array_map(Title::fromArray(...), $attrs['titles']),
             publicationYear: (int) $attrs['publicationYear'],
             publisher: is_array($attrs['publisher']) ? SdkPublisherData::fromArray($attrs['publisher']) : (string) $attrs['publisher'],
             types: ResourceType::fromArray($attrs['types']),
             url: $attrs['url'],
+            event: $event,
             alternateIdentifiers: array_map(AlternateIdentifier::fromArray(...), $attrs['alternateIdentifiers']),
             subjects: array_map(Subject::fromArray(...), $attrs['subjects']),
             contributors: array_values(array_filter(array_map(Contributor::fromArray(...), $attrs['contributors']))),
