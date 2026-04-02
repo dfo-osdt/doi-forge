@@ -151,19 +151,19 @@ When a user starts a new DOI, the profile's `data` (a `DoiData` DTO) seeds the f
 
 DOI Forge deliberately stores only what is needed for governance. It does not mirror DOI records.
 
-| Table                                   | Purpose                                                                                                     |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `repositories`                          | DataCite repository config, encrypted credentials, validator assignment                                     |
+| Table                                   | Purpose                                                                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `repositories`                          | DataCite repository config, encrypted credentials, validator assignment                                                                                      |
 | `profiles`                              | Metadata profiles — seed data (DoiData DTO), per repository (soft-deleted). No FK from DOIs — profile usage is recorded in the activity log at creation time |
-| `doi_reviews`                           | Review history — decisions, notes, validator snapshots, acknowledged warnings                                |
-| `validators`                            | Seeded registry of available metadata standard validators (stable IDs, slugs, class references)             |
-| `dois`                                  | Full DOI lifecycle from composing through publication — DataCite-shaped `form_data` autosaved incrementally |
-| `users`                                 | Local user records, created on first Entra login                                                            |
-| `personal_access_tokens`                | Sanctum API tokens (Spatie managed)                                                                         |
-| `repository_integrations`               | Optional external metadata source configs per repository                                                    |
-| `integration_sync_conflicts`            | Pending conflicts awaiting human resolution                                                                 |
-| `activity_log`                          | Full audit trail (Spatie)                                                                                   |
-| `roles / permissions / model_has_roles` | Spatie permission tables                                                                                    |
+| `doi_reviews`                           | Review history — decisions, notes, validator snapshots, acknowledged warnings                                                                                |
+| `validators`                            | Seeded registry of available metadata standard validators (stable IDs, slugs, class references)                                                              |
+| `dois`                                  | Full DOI lifecycle from composing through publication — DataCite-shaped `form_data` autosaved incrementally                                                  |
+| `users`                                 | Local user records, created on first Entra login                                                                                                             |
+| `personal_access_tokens`                | Sanctum API tokens (Spatie managed)                                                                                                                          |
+| `repository_integrations`               | Optional external metadata source configs per repository                                                                                                     |
+| `integration_sync_conflicts`            | Pending conflicts awaiting human resolution                                                                                                                  |
+| `activity_log`                          | Full audit trail (Spatie)                                                                                                                                    |
+| `roles / permissions / model_has_roles` | Spatie permission tables                                                                                                                                     |
 
 All tables use integer primary keys. Enumeration is not a concern — authentication and authorization prevent unauthorized access regardless of ID guessability. The DOI string itself (`10.1234/abc-xyz`) is the meaningful external identifier and is always returned in API responses.
 
@@ -177,14 +177,14 @@ The `DataCiteService` is the single boundary between DOI Forge and the `datacite
 
 The SDK ships plain PHP DTOs — framework-agnostic, no validation, no TypeScript generation. DOI Forge needs Spatie Data versions of the same DataCite shape to get colocated validation, auto-generated TypeScript, Inertia page props, and form request hydration. The two sets mirror the same DataCite JSON structure — conversion is `->toArray()` / `::from()` in each direction.
 
-| Concern | SDK DTO | Spatie Data |
-|---|---|---|
-| DataCite JSON shape | Yes | Yes (same shape) |
-| Colocated validation rules | No | `rules()` on each nested class |
-| TypeScript generation | No | Automatic via TypeScript Transformer |
-| Inertia page props | Manual | Automatic |
-| Enum casting, nested hydration | Manual | Declarative |
-| Form request hydration | No | `DoiData::from($request)` |
+| Concern                        | SDK DTO | Spatie Data                          |
+| ------------------------------ | ------- | ------------------------------------ |
+| DataCite JSON shape            | Yes     | Yes (same shape)                     |
+| Colocated validation rules     | No      | `rules()` on each nested class       |
+| TypeScript generation          | No      | Automatic via TypeScript Transformer |
+| Inertia page props             | Manual  | Automatic                            |
+| Enum casting, nested hydration | Manual  | Declarative                          |
+| Form request hydration         | No      | `DoiData::from($request)`            |
 
 **Directory structure:**
 
@@ -596,14 +596,14 @@ DOI Forge maintains its own application state machine that maps onto — but is 
 
 **State mapping:**
 
-| DOI Forge state    | DataCite state      | Notes                                                           |
-| ------------------ | ------------------- | --------------------------------------------------------------- |
-| `composing`        | none                | Local only, nothing in DataCite                                 |
-| `draft`            | `draft`             | DOI exists, deletable, not indexed                              |
-| `pending_approval` | `draft` or `findable` | Internal governance state — DataCite state unchanged while awaiting approval |
-| `published`        | `findable`          | We triggered the transition                                     |
-| `rejected`         | `draft` or `findable` | Returned to editor for corrections, resubmittable — DataCite state unchanged |
-| `withdrawn`        | none                | User-initiated cancellation of an unpublished DOI — DataCite draft deleted, record soft-deleted locally |
+| DOI Forge state    | DataCite state        | Notes                                                                                                   |
+| ------------------ | --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `composing`        | none                  | Local only, nothing in DataCite                                                                         |
+| `draft`            | `draft`               | DOI exists, deletable, not indexed                                                                      |
+| `pending_approval` | `draft` or `findable` | Internal governance state — DataCite state unchanged while awaiting approval                            |
+| `published`        | `findable`            | We triggered the transition                                                                             |
+| `rejected`         | `draft` or `findable` | Returned to editor for corrections, resubmittable — DataCite state unchanged                            |
+| `withdrawn`        | none                  | User-initiated cancellation of an unpublished DOI — DataCite draft deleted, record soft-deleted locally |
 
 `pending_approval` is purely internal. When a new DOI is submitted for first publication, DataCite remains `draft`. When a published DOI is edited and resubmitted, DataCite remains `findable` with the previous metadata — DOI Forge holds the pending changes in `form_data` and only pushes to DataCite on approval. The approval handler always issues a metadata update; for first publication this includes the `event: "publish"` flag to transition DataCite from `draft` to `findable`.
 
@@ -748,7 +748,7 @@ $table->timestamps();
 
 **Reviewer roles:**
 
-The `role` column identifies *what capacity* the reviewer is acting in for this specific review. In v1, the only role is `approver`. The column exists to support future multi-step workflows (e.g. `recommender` → `approver`, or `section_lead` → `approver`) without a schema migration. Queries like "show me all reviews where an approver (not a recommender) approved" work cleanly from day one.
+The `role` column identifies _what capacity_ the reviewer is acting in for this specific review. In v1, the only role is `approver`. The column exists to support future multi-step workflows (e.g. `recommender` → `approver`, or `section_lead` → `approver`) without a schema migration. Queries like "show me all reviews where an approver (not a recommender) approved" work cleanly from day one.
 
 **Status is derived, not stored:**
 
@@ -800,12 +800,12 @@ Built on Spatie Laravel Permission with the Teams feature enabled. Teams map dir
 
 ### 5.1 Roles
 
-| Role       | Scope          | Capabilities                                                                   |
-| ---------- | -------------- | ------------------------------------------------------------------------------ |
-| `admin`    | Global         | Manage repositories, assign roles, issue API tokens, full backend access       |
-| `approver` | Per repository | Review and approve/reject DOIs, plus all editor capabilities                   |
-| `editor`   | Per repository | Create, edit, and submit DOIs for approval                                     |
-| `observer` | Per repository | View DOIs and activity on the repository (default role on assignment)          |
+| Role       | Scope          | Capabilities                                                             |
+| ---------- | -------------- | ------------------------------------------------------------------------ |
+| `admin`    | Global         | Manage repositories, assign roles, issue API tokens, full backend access |
+| `approver` | Per repository | Review and approve/reject DOIs, plus all editor capabilities             |
+| `editor`   | Per repository | Create, edit, and submit DOIs for approval                               |
+| `observer` | Per repository | View DOIs and activity on the repository (default role on assignment)    |
 
 A user can hold different roles on different repositories (e.g. approver on publications, editor on data). Roles are cumulative — an approver inherits all editor capabilities. Observers are the starting point when a user is granted access to a repository; an admin upgrades them to editor or approver as needed.
 
@@ -1303,7 +1303,7 @@ Landing page URL monitoring (§10) is **not** an integration — it is a core DO
 
 ### 16.1 Design
 
-Integration *types* are PHP handler classes (global). Integration *instances* are database records (per repository). The handler knows how to connect and operate — the record holds the credentials and config.
+Integration _types_ are PHP handler classes (global). Integration _instances_ are database records (per repository). The handler knows how to connect and operate — the record holds the credentials and config.
 
 A repository can have multiple integrations of different types (Sierra + ORCID). Each integration type can only be attached once per repository — enforced by a unique constraint on `(repository_id, type)`.
 
@@ -1542,11 +1542,11 @@ activity()
 
 ### 17.2 State Mapping on Import
 
-| DataCite state | DOI Forge state | Notes |
-|---|---|---|
-| `findable` | `published` | Already public, `published_at` set from DataCite `registered` date |
-| `draft` | `draft` | Exists but not published, can be edited and submitted normally |
-| `registered` | `published` | Metadata-only (not indexed), treated as published since it was intentionally created |
+| DataCite state | DOI Forge state | Notes                                                                                |
+| -------------- | --------------- | ------------------------------------------------------------------------------------ |
+| `findable`     | `published`     | Already public, `published_at` set from DataCite `registered` date                   |
+| `draft`        | `draft`         | Exists but not published, can be edited and submitted normally                       |
+| `registered`   | `published`     | Metadata-only (not indexed), treated as published since it was intentionally created |
 
 ### 17.3 Import Commands
 
@@ -1568,7 +1568,7 @@ Also available as an admin UI action on the repository page ("Import from DataCi
 
 ### 17.4 What Import Does Not Do
 
-- **Validators do not run at import time.** Imported DOIs are already published — blocking import because they don't meet the current standard defeats the purpose. Validators run when someone *edits* an imported DOI and resubmits for approval. This naturally brings legacy records up to standard over time.
+- **Validators do not run at import time.** Imported DOIs are already published — blocking import because they don't meet the current standard defeats the purpose. Validators run when someone _edits_ an imported DOI and resubmits for approval. This naturally brings legacy records up to standard over time.
 - **No profile is assigned.** Imported DOIs were not created through a profile workflow. The activity log records `doi.imported` as the provenance.
 - **No review record is created.** The DOI was approved (or published directly) in the previous system. That history lives in DataCite's own activity log, not in DOI Forge.
 - **URL monitoring starts immediately.** Imported published DOIs are included in the daily URL monitoring schedule.

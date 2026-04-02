@@ -38,6 +38,18 @@ return [
             'report' => false,
         ],
 
+        'media' => [
+            'driver' => 'local',
+            'root' => storage_path('app/media'),
+            'throw' => false,
+        ],
+
+        'backup' => [
+            'driver' => 'local',
+            'root' => storage_path('app/backup'),
+            'throw' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
