@@ -180,3 +180,6 @@ jobs:
             sudo chmod -R 771 $STORAGE_PATH
             sudo systemctl reload php8.4-fpm.service
             php artisan horizon:terminate
+
+      - name: Delete local artifact
+        run: rm -f /tmp/forge-artifacts/forge_${{github.sha}}.tar.gz
