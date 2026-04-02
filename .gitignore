@@ -32,5 +32,4 @@ yarn-error.log
 /.mcp.json
 /opencode.json
 CLAUDE.md
-
 resources/ts/types/generated.d.ts
