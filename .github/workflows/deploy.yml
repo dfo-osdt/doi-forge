@@ -55,9 +55,7 @@ jobs:
           VITE_APP_VERSION: ${{ steps.version.outputs.value }}
 
       - name: Create deployment artifact
-        run: |
-          mkdir -p /tmp/forge-artifacts
-          tar -czf /tmp/forge-artifacts/forge_${{github.sha}}.tar.gz --exclude=".git" --exclude="node_modules" *
+        run: tar -czf /tmp/forge_${{github.sha}}.tar.gz --exclude=".git" --exclude="node_modules" *
 
   deploy-on-staging:
     runs-on: self-hosted
@@ -67,7 +65,7 @@ jobs:
       - name: Upload to staging server
         uses: appleboy/scp-action@master
         with:
-          source: /tmp/forge-artifacts/forge_${{github.sha}}.tar.gz
+          source: /tmp/forge_${{github.sha}}.tar.gz
           target: /var/www/${{secrets.SERVER}}/html/artifacts
           host: ${{secrets.SERVER}}
           port: 22
@@ -83,7 +81,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             mkdir -p /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
-            tar -xzf /var/www/${{secrets.SERVER}}/html/artifacts/forge_${{github.sha}}.tar.gz -C /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
+            tar -xzf /var/www/${{secrets.SERVER}}/html/artifacts/tmp/forge_${{github.sha}}.tar.gz -C /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
             rm -rf /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}/storage
 
       - name: Run deploy hooks
@@ -105,17 +103,15 @@ jobs:
             ln -s -f $BASE_PATH/.env $RELEASE_PATH
             ln -s -f $STORAGE_PATH $RELEASE_PATH
              composer install --optimize-autoloader --no-interaction --no-dev
-             php artisan filament:install --no-interaction
              php artisan optimize:clear
              php artisan config:clear
              php artisan view:clear
              php artisan config:cache
              php artisan migrate --force
-             php artisan db:seed --class=RoleAndPermissionSeeder --force
             ln -s -n -f $RELEASE_PATH $ACTIVE_RELEASE_PATH
-            sudo chown -h osp.www-data $ACTIVE_RELEASE_PATH
-            sudo chown -R osp.www-data $ACTIVE_RELEASE_PATH/
-            sudo chown -R osp.www-data $STORAGE_PATH
+            sudo chown -h forge.nginx $ACTIVE_RELEASE_PATH
+            sudo chown -R forge.nginx $ACTIVE_RELEASE_PATH/
+            sudo chown -R forge.nginx $STORAGE_PATH
             sudo chmod -R 771 $STORAGE_PATH
             sudo systemctl reload php8.4-fpm.service
             php artisan horizon:terminate
@@ -128,7 +124,7 @@ jobs:
       - name: Upload to production server
         uses: appleboy/scp-action@master
         with:
-          source: /tmp/forge-artifacts/forge_${{github.sha}}.tar.gz
+          source: /tmp/forge_${{github.sha}}.tar.gz
           target: /var/www/${{secrets.SERVER}}/html/artifacts
           host: ${{secrets.SERVER}}
           port: 22
@@ -144,7 +140,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             mkdir -p /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
-            tar -xzf /var/www/${{secrets.SERVER}}/html/artifacts/forge_${{github.sha}}.tar.gz -C /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
+            tar -xzf /var/www/${{secrets.SERVER}}/html/artifacts/tmp/forge_${{github.sha}}.tar.gz -C /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
             rm -rf /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}/storage
 
       - name: Run deploy hooks
@@ -166,20 +162,18 @@ jobs:
             ln -s -f $BASE_PATH/.env $RELEASE_PATH
             ln -s -f $STORAGE_PATH $RELEASE_PATH
              composer install --optimize-autoloader --no-interaction --no-dev
-             php artisan filament:install --no-interaction
              php artisan optimize:clear
              php artisan config:clear
              php artisan view:clear
              php artisan config:cache
              php artisan migrate --force
-             php artisan db:seed --class=RoleAndPermissionSeeder --force
             ln -s -n -f $RELEASE_PATH $ACTIVE_RELEASE_PATH
-            sudo chown -h osp.www-data $ACTIVE_RELEASE_PATH
-            sudo chown -R osp.www-data $ACTIVE_RELEASE_PATH/
-            sudo chown -R osp.www-data $STORAGE_PATH
+            sudo chown -h forge.nginx $ACTIVE_RELEASE_PATH
+            sudo chown -R forge.nginx $ACTIVE_RELEASE_PATH/
+            sudo chown -R forge.nginx $STORAGE_PATH
             sudo chmod -R 771 $STORAGE_PATH
             sudo systemctl reload php8.4-fpm.service
             php artisan horizon:terminate
 
       - name: Delete local artifact
-        run: rm -f /tmp/forge-artifacts/forge_${{github.sha}}.tar.gz
+        run: rm -f /tmp/forge_${{github.sha}}.tar.gz
