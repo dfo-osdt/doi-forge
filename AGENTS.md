@@ -155,7 +155,7 @@ This project has domain-specific skills available. You MUST activate the relevan
 - If you're creating a generic PHP class, use `php artisan make:class`.
 - Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
 
-### Model Creation
+## Model Creation
 
 - When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
 
@@ -203,6 +203,7 @@ Use Wayfinder to generate TypeScript functions for Laravel routes. Import from `
 # Inertia + Vue
 
 Vue components must have a single root element.
+
 - IMPORTANT: Activate `inertia-vue-development` when working with Inertia Vue client-side patterns.
 
 </laravel-boost-guidelines>

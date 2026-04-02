@@ -34,7 +34,7 @@ createInertiaApp({
 // Sync locale from Inertia shared props on every successful request
 router.on('success', (event) => {
   const locale = event.detail.page.props.locale as string
-  if (locale)  {
+  if (locale) {
     setLocale(locale)
   }
 })
