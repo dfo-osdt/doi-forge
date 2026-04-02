@@ -55,29 +55,19 @@ jobs:
           VITE_APP_VERSION: ${{ steps.version.outputs.value }}
 
       - name: Create deployment artifact
-        run: tar -czf osp_${{github.sha}}.tar.gz --exclude=".git" --exclude="node_modules" *
-
-      - name: Store artifact for distribution
-        uses: actions/upload-artifact@v7
-        with:
-          name: app-build
-          path: osp_${{github.sha}}.tar.gz
+        run: |
+          mkdir -p /tmp/forge-artifacts
+          tar -czf /tmp/forge-artifacts/forge_${{github.sha}}.tar.gz --exclude=".git" --exclude="node_modules" *
 
   deploy-on-staging:
     runs-on: self-hosted
     needs: build-release
     environment: staging
     steps:
-      - name: Get artifact from previous step
-        uses: actions/download-artifact@v8
-        with:
-          name: app-build
-          path: osp_${{github.sha}}.tar.gz
-
       - name: Upload to staging server
         uses: appleboy/scp-action@master
         with:
-          source: osp_${{github.sha}}.tar.gz
+          source: /tmp/forge-artifacts/forge_${{github.sha}}.tar.gz
           target: /var/www/${{secrets.SERVER}}/html/artifacts
           host: ${{secrets.SERVER}}
           port: 22
@@ -93,7 +83,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             mkdir -p /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
-            tar -xzf /var/www/${{secrets.SERVER}}/html/artifacts/osp_${{github.sha}}.tar.gz/osp_${{github.sha}}.tar.gz -C /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
+            tar -xzf /var/www/${{secrets.SERVER}}/html/artifacts/forge_${{github.sha}}.tar.gz -C /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
             rm -rf /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}/storage
 
       - name: Run deploy hooks
@@ -135,16 +125,10 @@ jobs:
     needs: deploy-on-staging
     environment: production
     steps:
-      - name: Get artifact from previous step
-        uses: actions/download-artifact@v8
-        with:
-          name: app-build
-          path: osp_${{github.sha}}.tar.gz
-
-      - name: Upload to staging server
+      - name: Upload to production server
         uses: appleboy/scp-action@master
         with:
-          source: osp_${{github.sha}}.tar.gz
+          source: /tmp/forge-artifacts/forge_${{github.sha}}.tar.gz
           target: /var/www/${{secrets.SERVER}}/html/artifacts
           host: ${{secrets.SERVER}}
           port: 22
@@ -160,7 +144,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             mkdir -p /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
-            tar -xzf /var/www/${{secrets.SERVER}}/html/artifacts/osp_${{github.sha}}.tar.gz/osp_${{github.sha}}.tar.gz -C /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
+            tar -xzf /var/www/${{secrets.SERVER}}/html/artifacts/forge_${{github.sha}}.tar.gz -C /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
             rm -rf /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}/storage
 
       - name: Run deploy hooks
