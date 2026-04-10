@@ -161,16 +161,16 @@ jobs:
             cd /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
             ln -s -f $BASE_PATH/.env $RELEASE_PATH
             ln -s -f $STORAGE_PATH $RELEASE_PATH
-             composer install --optimize-autoloader --no-interaction
-             php artisan optimize:clear
-             php artisan config:clear
-             php artisan view:clear
-             php artisan config:cache
-             php artisan migrate --force
+            composer install --optimize-autoloader --no-interaction
+            php artisan migrate --force
+            php artisan optimize:clear
+            php artisan config:clear
+            php artisan view:clear
+            php artisan config:cache
             ln -s -n -f $RELEASE_PATH $ACTIVE_RELEASE_PATH
-            sudo chown -h forge.nginx $ACTIVE_RELEASE_PATH
-            sudo chown -R forge.nginx $ACTIVE_RELEASE_PATH/
-            sudo chown -R forge.nginx $STORAGE_PATH
+            sudo chown -h forge:nginx $ACTIVE_RELEASE_PATH
+            sudo chown -R forge:nginx $ACTIVE_RELEASE_PATH/
+            sudo chown -R forge:nginx $STORAGE_PATH
             sudo chmod -R 771 $STORAGE_PATH
             sudo systemctl reload php8.4-fpm.service
             php artisan horizon:terminate
