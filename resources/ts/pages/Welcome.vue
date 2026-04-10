@@ -17,6 +17,7 @@ withDefaults(
 )
 
 const { t } = useI18n()
+const appVersion = import.meta.env.VITE_APP_VERSION ?? 'dev'
 </script>
 
 <template>
@@ -106,7 +107,7 @@ const { t } = useI18n()
       <div
         class="font-mono text-[10px] tracking-[0.3em] text-muted-foreground"
       >
-        v0.0.0
+        {{ appVersion }}
       </div>
     </footer>
   </div>
