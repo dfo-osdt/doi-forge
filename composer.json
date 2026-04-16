@@ -21,7 +21,8 @@
     "laravel/wayfinder": "^0.1.14",
     "predis/predis": "^3.4",
     "spatie/laravel-data": "^4.20",
-    "vincentauger/datacite-php-sdk": "^1.2"
+    "vincentauger/datacite-php-sdk": "^1.2",
+    "spatie/laravel-typescript-transformer": "^3.0"
   },
   "require-dev": {
     "barryvdh/laravel-ide-helper": "^3.7",
@@ -37,8 +38,7 @@
     "pestphp/pest": "^4.4",
     "pestphp/pest-plugin-browser": "^4.3",
     "pestphp/pest-plugin-laravel": "^4.1",
-    "rector/rector": "^2.3",
-    "spatie/laravel-typescript-transformer": "^3.0"
+    "rector/rector": "^2.3"
   },
   "autoload": {
     "psr-4": {
@@ -111,7 +111,9 @@
   },
   "extra": {
     "laravel": {
-      "dont-discover": ["spatie/laravel-typescript-transformer"]
+      "dont-discover": [
+        "spatie/laravel-typescript-transformer"
+      ]
     }
   },
   "config": {
