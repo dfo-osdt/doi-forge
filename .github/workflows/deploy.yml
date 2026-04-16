@@ -102,7 +102,7 @@ jobs:
             cd /var/www/${{secrets.SERVER}}/html/releases/${{github.sha}}
             ln -s -f $BASE_PATH/.env $RELEASE_PATH
             ln -s -f $STORAGE_PATH $RELEASE_PATH
-             composer install --optimize-autoloader --no-interaction
+             composer install --no-dev --optimize-autoloader --no-interaction
              php artisan optimize:clear
              php artisan config:clear
              php artisan view:clear
