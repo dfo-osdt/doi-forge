@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { TwoFactorConfigContent } from '@/types'
 import { Form } from '@inertiajs/vue3'
+import { Check, Copy, ScanLine } from '@lucide/vue'
 import { useClipboard } from '@vueuse/core'
-import { Check, Copy, ScanLine } from 'lucide-vue-next'
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import AlertError from '@/components/AlertError.vue'
 import InputError from '@/components/InputError.vue'

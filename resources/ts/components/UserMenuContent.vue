@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { User } from '@/types'
 import { Link, router, usePage } from '@inertiajs/vue3'
-import { Globe, LogOut, Settings } from 'lucide-vue-next'
+import { Globe, LogOut, Settings } from '@lucide/vue'
 import { computed } from 'vue'
 import { update as updateLocale } from '@/actions/App/Http/Controllers/LocaleController'
 import {

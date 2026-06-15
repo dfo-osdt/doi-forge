@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { router, usePage } from '@inertiajs/vue3'
-import { Globe } from 'lucide-vue-next'
+import { Globe } from '@lucide/vue'
 import { computed } from 'vue'
 import { update as updateLocale } from '@/actions/App/Http/Controllers/LocaleController'
 import {
