@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AcceptableValue } from 'reka-ui'
 import { router, usePage } from '@inertiajs/vue3'
 import { Globe } from '@lucide/vue'
 import { computed } from 'vue'
@@ -19,8 +20,10 @@ const locales = [
   { value: 'fr', label: 'Français' },
 ]
 
-function switchLocale(locale: string) {
-  router.patch(updateLocale().url, { locale })
+// reka-ui types the radio group's payload as the non-generic `AcceptableValue`,
+// so it cannot know this group only ever emits one of `locales`.
+function switchLocale(locale: AcceptableValue) {
+  router.patch(updateLocale().url, { locale: locale as string })
 }
 </script>
 
