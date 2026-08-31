@@ -4,9 +4,11 @@ pre-commit:
     pint:
       glob: '*.php'
       run: vendor/bin/pint {staged_files}
+      stage_fixed: true
     eslint:
       glob: '*.{ts,vue,js}'
       run: pnpm eslint --fix {staged_files}
+      stage_fixed: true
 
 commit-msg:
   commands:
