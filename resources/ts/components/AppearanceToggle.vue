@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { AcceptableValue } from 'reka-ui'
+import type { Appearance } from '@/types'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,6 +11,12 @@ import {
 import { useAppearance } from '@/composables/useAppearance'
 
 const { appearance, activeIcon, options, updateAppearance } = useAppearance()
+
+// reka-ui types the radio group's payload as the non-generic `AcceptableValue`,
+// so it cannot know this group only ever emits an `Appearance`.
+function selectAppearance(value: AcceptableValue) {
+  updateAppearance(value as Appearance)
+}
 </script>
 
 <template>
@@ -19,7 +27,7 @@ const { appearance, activeIcon, options, updateAppearance } = useAppearance()
       <component :is="activeIcon" class="size-4" />
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">
-      <DropdownMenuRadioGroup :model-value="appearance" @update:model-value="updateAppearance">
+      <DropdownMenuRadioGroup :model-value="appearance" @update:model-value="selectAppearance">
         <DropdownMenuRadioItem v-for="{ value, Icon, label } in options" :key="value" :value="value">
           <component :is="Icon" class="mr-2 size-4" />
           {{ label }}
